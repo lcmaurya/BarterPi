@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barter-Pi Testnet</title>
+    <!-- Pi SDK Integration -->
     <script src="https://sdk.mine.pi/pi-platform-library.js"></script>
+    <!-- Tailwind CSS for modern, responsive design -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -20,7 +22,14 @@
 </head>
 <body>
 
+    <!-- Main Application Container -->
     <div id="app" class="min-h-screen">
+        <!-- Error Display Box ADDED HERE -->
+        <div id="errorDisplayBox" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative hidden" role="alert">
+            <strong class="font-bold">FATAL ERROR:</strong>
+            <span class="block sm:inline" id="errorMessageContent">Initialization failed.</span>
+        </div>
+        <!-- Header -->
         <header class="bg-[#1c2e4a] p-4 shadow-lg sticky top-0 z-10">
             <div class="max-w-6xl mx-auto flex justify-between items-center">
                 <h1 class="text-3xl font-bold text-white tracking-wider">
@@ -35,18 +44,22 @@
             </div>
         </header>
 
+        <!-- Main Content Layout (Responsive Grid) -->
         <main class="max-w-6xl mx-auto p-4 grid lg:grid-cols-[1fr_360px] gap-6 mt-6">
 
+            <!-- Left Column: Listings -->
             <section class="bg-white p-6 rounded-xl shadow-2xl">
                 <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">
                     Latest <span class="pi-brand">Barter</span> Listings (पंजीकृत वस्तुएं)
                 </h2>
+                <!-- Search and Filters (Placeholder) -->
                 <div class="mb-6 flex space-x-3">
                     <input type="text" id="searchInput" placeholder="Search items or keywords..."
                            class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-pi-brand focus:border-pi-brand transition duration-150">
                     <button id="searchButton" class="pi-button px-4 py-2 rounded-lg shadow-md">Search</button>
                 </div>
 
+                <!-- Listings Grid -->
                 <div id="listingsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <p id="loadingMessage" class="col-span-full text-center text-gray-500 py-8">
                         Firestore से लिस्टिंग लोड हो रही है...
@@ -54,7 +67,9 @@
                 </div>
             </section>
 
+            <!-- Right Column: Sidebar (Create Listing/Wallet) -->
             <aside class="space-y-6">
+                <!-- Create New Listing Card -->
                 <div class="bg-white p-6 rounded-xl shadow-2xl border-t-4 border-pi-brand">
                     <h3 class="text-xl font-semibold mb-4 text-gray-800">
                         Post a New <span class="pi-brand">Barter</span> (नई वस्तु)
@@ -67,6 +82,7 @@
                     </button>
                 </div>
 
+                <!-- Order History / Wallet Status Card -->
                 <div class="bg-white p-6 rounded-xl shadow-2xl">
                     <h3 class="text-xl font-semibold mb-4 text-gray-800">
                         Pi Wallet & Orders (ऑर्डर इतिहास)
@@ -83,6 +99,7 @@
         </main>
     </div>
 
+    <!-- 1. Create Listing Modal -->
     <div id="createListingModal" class="modal-overlay fixed inset-0 z-50 justify-center items-center p-4">
         <div class="bg-white w-full max-w-lg p-6 rounded-xl shadow-3xl transform transition-all duration-300">
             <h2 class="text-2xl font-bold mb-4 border-b pb-2">Create New Listing (नई वस्तु पोस्ट करें)</h2>
@@ -111,6 +128,7 @@
         </div>
     </div>
 
+    <!-- 2. Orders/Payments Modal (Placeholder for Pi Payment Flow) -->
     <div id="ordersModal" class="modal-overlay fixed inset-0 z-50 justify-center items-center p-4">
         <div class="bg-white w-full max-w-3xl p-6 rounded-xl shadow-3xl transform transition-all duration-300">
             <h2 class="text-2xl font-bold mb-4 border-b pb-2">Your Transaction History (आपके लेन-देन)</h2>
@@ -127,11 +145,24 @@
         </div>
     </div>
 
+    <!-- Firebase Initialization and Script -->
     <script type="module">
         // Canvas environment द्वारा प्रदान किए गए ग्लोबल वैरिएबल
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // स्क्रीन पर त्रुटि दिखाने का फ़ंक्शन
+        function displayFatalError(message) {
+            const errorBox = document.getElementById('errorDisplayBox');
+            const errorMessageContent = document.getElementById('errorMessageContent');
+            if (errorBox && errorMessageContent) {
+                errorMessageContent.textContent = message;
+                errorBox.classList.remove('hidden');
+                console.error("FATAL ERROR DISPLAYED:", message);
+            }
+        }
+
 
         // 1. Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -143,9 +174,20 @@
         setLogLevel('debug');
 
         // 2. Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
+        let app, db, auth;
+        try {
+            if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.projectId) {
+                displayFatalError("Firebase कॉन्फ़िगरेशन खाली या अमान्य है। Firebase को लोड नहीं किया जा सकता।");
+                return; // Initialization रोकें
+            }
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch (e) {
+             displayFatalError(`Firebase Initialization failed: ${e.message}`);
+             console.error("Firebase Initialization failed:", e);
+             return; // Initialization रोकें
+        }
         
         // Pi SDK Initialization (Pi.js)
         if (typeof Pi !== 'undefined') {
@@ -209,7 +251,7 @@
                 renderListings(listings);
             }, (error) => {
                 console.error("लिस्टिंग प्राप्त करने में त्रुटि (Error fetching listings):", error);
-                document.getElementById('loadingMessage').textContent = 'लिस्टिंग लोड करने में त्रुटि।';
+                document.getElementById('loadingMessage').textContent = 'लिस्टिंग लोड करने में त्रुटि। विवरण के लिए कंसोल देखें।';
             });
 
             // B. Payments Listener (भुगतान श्रोता) - निजी (Private)
@@ -493,20 +535,3 @@
     </script>
 </body>
 </html>
-```eof
-
----
-
-## 🛠️ अगला कदम: डिप्लॉयमेंट को ठीक करना
-
-यह कोड **Pi SDK** को भी जोड़ता है (लाइन 8 पर), जिसका अर्थ है कि एक बार डिप्लॉयमेंट ठीक हो जाने के बाद, आपके **भुगतान (Payment)** और **Pi Login** की समस्याएँ हल हो जानी चाहिए।
-
-कृपया ये **अंतिम चरण** ठीक से करें:
-
-1.  **GitHub Repo:** अपनी `Barter-Pi` रेपो में, **`index.html`** फ़ाइल को **सीधे रूट (Root)** में इस नए कोड से बदल दें।
-2.  **Render Settings:**
-    * **Root Directory** को **खाली (Blank)** छोड़ दें।
-    * **Publish Directory** को **`.` (केवल एक बिंदु)** पर सेट करें।
-3.  **Deploy:** Render पर **Manual Deploy** करें।
-
-मुझे पूरी उम्मीद है कि इस बार आपकी साइट सफलतापूर्वक लोड हो जाएगी!
