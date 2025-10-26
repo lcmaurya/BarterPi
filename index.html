@@ -6,21 +6,26 @@
     <meta name="theme-color" content="#000000" />
     <meta name="description" content="Pi Network Barter Application" />
     <title>Barter-Pi Pro - Final UI</title>
-    <!-- Tailwind CSS (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
+        /* कस्टम स्क्रॉल बार (वैकल्पिक) */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div id="root"></div>
 
-    <!-- React and Babel -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
+        const { useState, useEffect } = React;
+
         // --- Static Configuration & Dummy Data ---
         const DUMMY_USER_ID = "ADM_PRO_USER_007";
         const ADMIN_ID = DUMMY_USER_ID; 
@@ -29,11 +34,13 @@
             { id: 'l1', itemName: 'Apple iPhone 14 Pro', description: 'ब्रांड न्यू, सील पैक। 256GB, डीप पर्पल। विनिमय (Barter) या Pi दोनों के लिए उपलब्ध।', pricePi: 450, status: 'Active', posterId: 'user_a01b2c3d', image: 'https://via.placeholder.com/400x300?text=iPhone', timestamp: new Date(Date.now() - 86400000), location: 'Local', delivery: 'Local Pickup' },
             { id: 'l2', itemName: 'पुराना साइकिल', description: 'अच्छी कार्यशील स्थिति में, थोड़ी मरम्मत की आवश्यकता है। केवल स्थानीय पिकअप।', pricePi: 5, status: 'Active', posterId: 'user_e4f5g6h7', image: 'https://via.placeholder.com/400x300?text=Bicycle', timestamp: new Date(Date.now() - 3600000), location: 'Global', delivery: 'Shipping' },
             { id: 'l3', itemName: 'वेबसाइट डिजाइन सेवा', description: 'एक पेज की लैंडिंग पेज वेबसाइट का आकर्षक डिजाइन। 3 दिन में डिलीवरी।', pricePi: 50, status: 'Pending', posterId: 'user_i8j9k0l1', image: 'https://via.placeholder.com/400x300?text=Web+Design', timestamp: new Date(Date.now() - 7200000), location: 'Global', delivery: 'Digital' },
+            { id: 'l4', itemName: 'Pi माइनिंग नोड सेटअप', description: 'अपने Raspberry Pi पर एक स्थिर Pi नोड सेट करें। 24 घंटे का सपोर्ट।', pricePi: 25, status: 'Active', posterId: 'user_node_tech', image: 'https://via.placeholder.com/400x300?text=Pi+Node+Setup', timestamp: new Date(Date.now() - 10000), location: 'Global', delivery: 'Digital' },
         ];
 
         const DUMMY_ORDERS = [
-            { id: 'o1', item: 'iPhone 14 Pro', price: 450, status: 'Shipped', tracking: 'TRK001', delivery: 'Local' },
-            { id: 'o2', item: 'Laptop Repair Service', price: 35, status: 'Delivered', tracking: 'TRK002', delivery: 'Global' },
+            { id: 'o1', item: 'iPhone 14 Pro', price: 450, status: 'Shipped', tracking: 'TRK001', delivery: 'Local', buyer: 'user_xyz' },
+            { id: 'o2', item: 'Laptop Repair Service', price: 35, status: 'Delivered', tracking: 'TRK002', delivery: 'Global', buyer: DUMMY_USER_ID },
+            { id: 'o3', item: 'Old Bicycle', price: 5, status: 'Pending Payment', tracking: 'TRK003', delivery: 'Local', buyer: DUMMY_USER_ID },
         ];
         
         // --- Shared Components: Nav, Header ---
@@ -56,11 +63,13 @@
                         Barter-<span className="text-yellow-500">Pi</span> Pro
                     </h1>
                     <div className="flex space-x-2 overflow-x-auto pb-1">
-                        <NavButton title="Home" page="Home" currentPage={currentPage} setPage={setPage} />
-                        <NavButton title="Chat" page="Chat" currentPage={currentPage} setPage={setPage} />
-                        <NavButton title="Orders" page="Orders" currentPage={currentPage} setPage={setPage} />
-                        <NavButton title="AI Helper" page="AIHelper" currentPage={currentPage} setPage={setPage} />
-                        <NavButton title="Admin" page="Admin" currentPage={currentPage} setPage={setPage} />
+                        <NavButton title="होम" page="Home" currentPage={currentPage} setPage={setPage} />
+                        <NavButton title="चैट" page="Chat" currentPage={currentPage} setPage={setPage} />
+                        <NavButton title="ऑर्डर्स" page="Orders" currentPage={currentPage} setPage={setPage} />
+                        <NavButton title="AI हेल्पर" page="AIHelper" currentPage={currentPage} setPage={setPage} />
+                        {DUMMY_USER_ID === ADMIN_ID && (
+                            <NavButton title="एडमिन" page="Admin" currentPage={currentPage} setPage={setPage} />
+                        )}
                     </div>
                     <div className="text-sm text-gray-600 text-right mt-2 sm:mt-0">
                         यूज़र ID: 
@@ -71,45 +80,46 @@
                 </div>
             </header>
         );
+
         // --- Listing Detail Modal ---
         const ListingDetailModal = ({ isOpen, onClose, listing }) => {
             if (!isOpen || !listing) return null;
 
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-start pt-10 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-y-auto max-h-[90vh]">
-                        <div className="p-6 border-b flex justify-between items-center">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-y-auto max-h-[90vh] animate-in slide-in-from-top-4 duration-300">
+                        <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10">
                             <h2 className="text-2xl font-bold text-gray-800">{listing.itemName}</h2>
-                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-3xl font-light">&times;</button>
                         </div>
                         <div className="p-6 space-y-6">
                             <img src={listing.image.replace('400x300', '600x400')} alt={listing.itemName} className="w-full h-64 object-cover rounded-lg shadow-md" />
                             
-                            <div className="flex justify-between items-center">
-                                <div className="text-3xl font-extrabold text-indigo-600">{listing.pricePi} Pi</div>
-                                <span className="px-3 py-1 text-sm font-bold rounded-full bg-green-100 text-green-700">{listing.status}</span>
+                            <div className="flex justify-between items-center border-b pb-4">
+                                <div className="text-4xl font-extrabold text-indigo-600">{listing.pricePi} Pi</div>
+                                <span className="px-4 py-2 text-md font-bold rounded-full bg-green-100 text-green-700">{listing.status}</span>
                             </div>
 
-                            <p className="text-gray-700">{listing.description}</p>
+                            <h3 className="text-xl font-semibold text-gray-800">विवरण</h3>
+                            <p className="text-gray-700 leading-relaxed">{listing.description}</p>
 
                             <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 border-t pt-4">
-                                <div><span className="font-semibold">Seller ID:</span> {listing.posterId}</div>
-                                <div><span className="font-semibold">Rating:</span> ⭐⭐⭐⭐ (4.5/5)</div>
+                                <div><span className="font-semibold">Seller ID:</span> <span className="font-mono text-xs bg-gray-100 p-1 rounded">{listing.posterId}</span></div>
+                                <div><span className="font-semibold">Posted:</span> {listing.timestamp.toLocaleDateString('hi-IN')}</div>
                                 <div><span className="font-semibold">Location:</span> {listing.location}</div>
                                 <div><span className="font-semibold">Delivery:</span> {listing.delivery}</div>
                             </div>
                             
-                            {/* Dummy 360 View Placeholder */}
-                            <div className="bg-gray-100 h-20 rounded-lg flex items-center justify-center text-gray-500 text-sm">
-                                [360° Product View Placeholder]
+                            <div className="bg-gray-100 p-4 rounded-lg flex items-center justify-center text-gray-500 text-sm">
+                                [360° Product View & Video Preview Placeholder]
                             </div>
 
-                            <div className="space-y-2 pt-4 border-t">
-                                <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 rounded-lg transition" onClick={() => alert('Initiating Secure Pi Payment...')}>
-                                    <span role="img" aria-label="Pay">💳</span> Buy Now / Make Offer
+                            <div className="space-y-3 pt-4 border-t">
+                                <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 rounded-lg transition shadow-md" onClick={() => alert(`Initiating Secure Pi Payment for ${listing.pricePi} Pi...`)}>
+                                    <span role="img" aria-label="Pay">💳</span> अभी खरीदें / Pi ऑफ़र दें
                                 </button>
-                                <button className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-lg transition" onClick={() => alert('Opening Chat with Seller...')}>
-                                    <span role="img" aria-label="Chat">💬</span> Chat Now
+                                <button className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-lg transition shadow-md" onClick={() => alert('Opening Chat with Seller...')}>
+                                    <span role="img" aria-label="Chat">💬</span> चैट शुरू करें
                                 </button>
                             </div>
                         </div>
@@ -121,16 +131,16 @@
         // --- Listing Card Component ---
         const ListingCard = ({ listing, onClick }) => (
             <div 
-                className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200 hover:shadow-2xl hover:cursor-pointer transition duration-300"
+                className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 hover:shadow-2xl hover:cursor-pointer transition duration-300 transform hover:scale-[1.02]"
                 onClick={() => onClick(listing)}
             >
                 <img src={listing.image} alt={listing.itemName} className="w-full h-40 object-cover" />
                 <div className="p-4">
-                    <h3 className="text-lg font-bold text-gray-800 mb-1">{listing.itemName}</h3>
+                    <h3 className="text-lg font-bold text-gray-800 mb-1 h-12 overflow-hidden">{listing.itemName}</h3>
                     <p className="text-xs text-gray-500 mb-3 h-8 overflow-hidden">{listing.description}</p>
                     
                     <div className="flex justify-between items-center mb-3">
-                        <div className="text-xl font-extrabold text-indigo-600">
+                        <div className="text-2xl font-extrabold text-indigo-600">
                             {listing.pricePi} Pi
                         </div>
                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${listing.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
@@ -139,52 +149,58 @@
                     </div>
 
                     <button className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm transition">
-                        <span role="img" aria-label="Details">ℹ️</span> View Details
+                        <span role="img" aria-label="Details">ℹ️</span> विवरण देखें
                     </button>
                 </div>
             </div>
         );
         // --- New Listing Modal Component ---
-        const NewListingModal = ({ isOpen, onClose }) => {
+        const NewListingModal = ({ isOpen, onClose, onSave }) => {
             if (!isOpen) return null;
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                alert('लिस्टिंग ड्राफ्ट सेव हो गया! यह Pi मॉडरेटर की समीक्षा के लिए पेंडिंग है।');
+                onClose();
+                // Actual save logic would go here
+            };
 
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-start pt-10 p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
-                        <div className="p-6 border-b flex justify-between items-center">
+                        <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10">
                             <h2 className="text-2xl font-bold text-gray-800">नया बार्टर पोस्ट करें</h2>
-                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+                            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-3xl font-light">&times;</button>
                         </div>
-                        <div className="p-6 space-y-4">
-                            <input type="text" placeholder="आइटम का नाम (जैसे iPhone 14 Pro)" className="w-full p-3 border border-gray-300 rounded-lg" />
-                            <textarea placeholder="आइटम का विस्तृत विवरण..." rows="4" className="w-full p-3 border border-gray-300 rounded-lg"></textarea>
+                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                            <input type="text" required placeholder="आइटम का नाम (जैसे Pi Node Service)" className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" />
+                            <textarea required placeholder="आइटम का विस्तृत विवरण (500 वर्ण तक)..." rows="4" className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                             
-                            {/* AI Description Feature */}
-                            <button className="w-full bg-blue-100 text-blue-700 font-semibold py-2 rounded-lg hover:bg-blue-200 transition">
-                                <span role="img" aria-label="AI">🤖</span> AI से विवरण जनरेट करें (Gemini)
+                            <button type="button" className="w-full bg-yellow-100 text-yellow-700 font-semibold py-2 rounded-lg hover:bg-yellow-200 transition">
+                                <span role="img" aria-label="AI">💡</span> Pi-आधारित विवरण का सुझाव दें
                             </button>
 
-                            <input type="number" placeholder="Pi में कीमत (जैसे 450 Pi)" className="w-full p-3 border border-gray-300 rounded-lg" />
+                            <input type="number" required placeholder="Pi में कीमत (जैसे 450 Pi)" step="0.01" min="0.01" className="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" />
                             
-                            {/* Image/Video Upload */}
                             <div className="border border-dashed border-gray-400 p-4 rounded-lg text-center">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Image/Video Upload (Dummy)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">छवि/वीडियो अपलोड (अधिकतम 3)</label>
                                 <input type="file" multiple className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
                             </div>
-                        </div>
-                        <div className="p-6 border-t flex justify-end">
-                            <button onClick={onClose} className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg mr-3 hover:bg-gray-300">रद्द करें</button>
-                            <button className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">लिस्टिंग पोस्ट करें (Dummy Save)</button>
-                        </div>
+                            
+                            <div className="flex justify-end pt-4 border-t">
+                                <button type="button" onClick={onClose} className="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg mr-3 hover:bg-gray-300 transition">रद्द करें</button>
+                                <button type="submit" className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition shadow-md">लिस्टिंग पोस्ट करें</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             );
         };
-
-        const HomePage = () => {
-            const [isNewListingModalOpen, setIsNewListingModalOpen] = React.useState(false);
-            const [isDetailModalOpen, setIsDetailModalOpen] = React.useState(false);
-            const [selectedListing, setSelectedListing] = React.useState(null);
+        // --- Page Components ---
+        const HomePage = ({ setPage }) => {
+            const [isNewListingModalOpen, setIsNewListingModalOpen] = useState(false);
+            const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+            const [selectedListing, setSelectedListing] = useState(null);
 
             const openDetailModal = (listing) => {
                 setSelectedListing(listing);
@@ -193,23 +209,49 @@
 
             const sortedListings = DUMMY_LISTINGS.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
             return (
-                <div className="space-y-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+                    {/* Pi Wallet Snapshot */}
+                    <div className="bg-indigo-600 p-6 rounded-xl shadow-xl text-white flex justify-between items-center">
+                        <div>
+                            <p className="text-lg font-semibold mb-1">Pi Wallet Balance (Mainnet)</p>
+                            <h2 className="text-4xl font-extrabold">12,456.78 <span className="text-yellow-400">Pi</span></h2>
+                            <p className="text-sm opacity-80 mt-1">~$2,990.00 USD (Dummy Rate)</p>
+                        </div>
+                        <button 
+                            className="bg-yellow-500 text-gray-900 font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-yellow-400 transition"
+                            onClick={() => alert('Opening Pi Browser Wallet...')}
+                        >
+                            <span role="img" aria-label="Wallet">👛</span> Pi Wallet खोलें
+                        </button>
+                    </div>
+
                     {/* Search and Mapping */}
                     <div className="bg-white p-6 rounded-xl shadow-lg border border-indigo-100">
-                        <h2 className="text-xl font-bold text-gray-800 mb-3">लोकल/ग्लोबल बार्टर</h2>
+                        <h2 className="text-xl font-bold text-gray-800 mb-3">लोकल / ग्लोबल बार्टर खोजें</h2>
                         <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mb-4">
                             <input type="text" placeholder="आइटम या कीवर्ड खोजें..." className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" />
                             <select className="p-3 border border-gray-300 rounded-lg">
                                 <option>ग्लोबल</option>
                                 <option>लोकल (50km)</option>
                             </select>
-                            <button className="bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700">Search</button>
+                            <button className="bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition">खोज</button>
                         </div>
                         <div className="h-40 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500">
-                            [Global/Local Mapping Placeholder - Dummy]
+                            [Global Barter Map Placeholder]
                         </div>
                     </div>
 
+                    {/* Post New Section */}
+                    <section className="p-8 bg-green-50 border border-green-200 rounded-xl shadow-lg flex justify-between items-center">
+                        <h2 className="text-xl font-semibold text-green-800">आपका क्या बार्टर करना चाहेंगे?</h2>
+                        <button 
+                            className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-xl transition"
+                            onClick={() => setIsNewListingModalOpen(true)}
+                        >
+                            + नई लिस्टिंग पोस्ट करें
+                        </button>
+                    </section>
+                    
                     {/* Latest Listings */}
                     <h2 className="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">लेटेस्ट बार्टर लिस्टिंग्स</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -218,17 +260,6 @@
                         ))}
                     </div>
 
-                    {/* Post New Section */}
-                    <section className="p-8 bg-yellow-50 border border-yellow-200 rounded-xl shadow-lg">
-                        <h2 className="text-xl font-semibold text-yellow-800 mb-4">एक नई लिस्टिंग पोस्ट करें (Seller Section)</h2>
-                        <button 
-                            className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-lg shadow-xl transition"
-                            onClick={() => setIsNewListingModalOpen(true)}
-                        >
-                            + नई लिस्टिंग शुरू करें
-                        </button>
-                    </section>
-                    
                     <NewListingModal isOpen={isNewListingModalOpen} onClose={() => setIsNewListingModalOpen(false)} />
                     <ListingDetailModal 
                         isOpen={isDetailModalOpen} 
@@ -240,188 +271,244 @@
         };
         // --- Chat Page ---
         const ChatPage = () => (
-            <div className="p-4 sm:p-8 bg-white rounded-xl shadow-lg h-[600px] flex border border-gray-200">
-                <div className="flex flex-col w-full md:w-1/3 border-r pr-4 space-y-2 hidden sm:flex">
-                    <h3 className="font-bold text-lg mb-2">My Chats</h3>
-                    <div className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-semibold">💬 Seller: iPhone 14 Pro</div>
-                    <div className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg">💬 Buyer: Old Bicycle</div>
-                    <div className="px-3 py-2 bg-yellow-100 text-yellow-700 rounded-lg">🤖 AI Helper Chat</div>
-                    <div className="text-center text-xs text-gray-400 mt-2">New Messages: 2</div>
-                </div>
-                <div className="flex flex-col w-full md:w-2/3 md:pl-4">
-                    <h2 className="text-xl font-bold text-gray-800 mb-4">iPhone 14 Pro Chat</h2>
-                    <div className="flex-grow bg-gray-50 p-4 rounded-lg overflow-y-scroll space-y-4">
-                        {/* Message History */}
-                        <div className="flex justify-start items-start">
-                            <img src="https://via.placeholder.com/30" alt="User" className="w-8 h-8 rounded-full mr-2"/>
-                            <div>
-                                <div className="bg-blue-100 p-3 rounded-xl max-w-xs shadow-sm">नमस्ते, मुझे यह लेना है, क्या आप बार्टर स्वीकार करेंगे?</div>
-                                <p className="text-xs text-gray-400 mt-1">10:15 AM</p>
-                            </div>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="p-4 sm:p-8 bg-white rounded-xl shadow-lg h-[700px] flex border border-gray-200">
+                    {/* Chat List */}
+                    <div className="flex flex-col w-full md:w-1/3 border-r pr-4 space-y-2 overflow-y-auto">
+                        <h3 className="font-bold text-lg mb-2 text-indigo-600">मेरी चैट्स</h3>
+                        <div className="px-3 py-3 bg-indigo-100 text-indigo-700 rounded-xl font-semibold border-l-4 border-indigo-600 cursor-pointer">
+                            💬 **iPhone 14 Pro** (Buyer)
+                            <p className="text-xs text-gray-500 mt-1">आखिरी मैसेज: ठीक है, मैं Pi भेज रहा हूँ।</p>
                         </div>
-                        <div className="flex justify-end items-start">
-                            <div className="text-right">
-                                <div className="bg-green-100 p-3 rounded-xl max-w-xs shadow-sm">ठीक है, शिपिंग पता दें। क्या आप $50 Pi जोड़ सकते हैं?</div>
-                                <p className="text-xs text-gray-400 mt-1">10:18 AM</p>
-                            </div>
-                            <img src="https://via.placeholder.com/30" alt="Me" className="w-8 h-8 rounded-full ml-2"/>
+                        <div className="px-3 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 cursor-pointer">
+                            💬 **Pi Node Setup** (Seller)
+                            <p className="text-xs text-gray-500 mt-1">आखिरी मैसेज: क्या आप $5 Pi जोड़ सकते हैं?</p>
                         </div>
-                        <div className="text-center text-xs text-gray-500">असली मैसेजिंग लॉजिक जोड़ा जाना बाकी है।</div>
+                        <div className="px-3 py-3 bg-yellow-100 text-yellow-700 rounded-xl hover:bg-yellow-200 cursor-pointer">
+                            🤖 **AI Helper Chat**
+                        </div>
                     </div>
-                    <div className="mt-4 flex space-x-2">
-                        <input type="text" placeholder="मैसेज लिखें..." className="flex-grow p-3 border border-gray-300 rounded-lg" />
-                        <button className="bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700">Send</button>
+                    {/* Chat Window */}
+                    <div className="flex flex-col w-full md:w-2/3 md:pl-4">
+                        <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">iPhone 14 Pro (Chat with Seller)</h2>
+                        <div className="flex-grow bg-gray-50 p-4 rounded-lg overflow-y-scroll space-y-4">
+                            {/* Message 1 (Other User) */}
+                            <div className="flex justify-start items-start">
+                                <img src="https://via.placeholder.com/30" alt="User" className="w-8 h-8 rounded-full mr-3 border-2 border-indigo-500"/>
+                                <div>
+                                    <div className="bg-white p-3 rounded-xl rounded-tl-none max-w-xs shadow-md">नमस्ते, क्या 400 Pi ठीक रहेगा?</div>
+                                    <p className="text-xs text-gray-400 mt-1">10:15 AM</p>
+                                </div>
+                            </div>
+                            {/* Message 2 (Me) */}
+                            <div className="flex justify-end items-start">
+                                <div className="text-right">
+                                    <div className="bg-indigo-100 p-3 rounded-xl rounded-tr-none max-w-xs shadow-md">450 Pi अंतिम मूल्य है।</div>
+                                    <p className="text-xs text-gray-400 mt-1">10:18 AM</p>
+                                </div>
+                                <img src="https://via.placeholder.com/30" alt="Me" className="w-8 h-8 rounded-full ml-3 border-2 border-green-500"/>
+                            </div>
+                            <div className="text-center text-xs text-gray-500">यहां **Secure Pi Payment Link** शेयर करने की अनुमति है।</div>
+                        </div>
+                        <div className="mt-4 flex space-x-2">
+                            <input type="text" placeholder="मैसेज लिखें..." className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" />
+                            <button className="bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition">Send</button>
+                        </div>
                     </div>
                 </div>
             </div>
         );
 
         // --- Orders Page ---
-        const OrdersPage = () => (
-            <div className="p-4 sm:p-8 bg-white rounded-xl shadow-lg border border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">Order और Delivery Status</h2>
-                
-                {DUMMY_ORDERS.map(order => (
-                    <div key={order.id} className="mb-4 p-4 border border-gray-100 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                        <div>
-                            <p className="font-semibold text-lg">{order.item}</p>
-                            <p className="text-sm text-gray-500">कीमत: {order.price} Pi | ट्रैकिंग: {order.tracking}</p>
-                            <p className="text-xs text-gray-400">Delivery Type: {order.delivery}</p>
-                        </div>
-                        <div className="text-right mt-2 sm:mt-0">
-                            <span className={`px-3 py-1 text-sm font-bold rounded-full block ${order.status === 'Delivered' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-gray-900'}`}>
-                                {order.status}
-                            </span>
-                            <button className="mt-1 text-indigo-600 text-sm hover:underline block">Review लिखें</button>
-                        </div>
-                    </div>
-                ))}
-                
-                <div className="mt-8 pt-4 border-t border-dashed">
-                    <h3 className="text-xl font-semibold mb-3">Pi Wallet Overview</h3>
-                    <p className="text-sm text-gray-600">यह खंड Pi Wallet SDK और आपके भुगतान इतिहास को दिखाएगा।</p>
-                    <button 
-                        className="mt-3 bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700"
-                        onClick={() => alert('Pi Wallet Connect Modal Open (Dummy)')}
-                    >
-                        Wallet Connect & History
-                    </button>
-                </div>
-            </div>
-        );
+        const OrdersPage = () => {
+            const myOrders = DUMMY_ORDERS.filter(o => o.buyer === DUMMY_USER_ID);
+            const sellingOrders = DUMMY_ORDERS.filter(o => o.buyer !== DUMMY_USER_ID);
 
-        // --- AI Helper Page (Enhanced) ---
-        const AIHelperPage = () => (
-            <div className="p-4 sm:p-8 bg-indigo-50 rounded-xl shadow-lg border border-indigo-300">
-                <h2 className="text-2xl font-bold text-indigo-800 mb-6">🤖 AI Helper & Market Tools</h2>
-                
-                <div className="grid md:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-white p-6 rounded-lg shadow-md col-span-1">
-                        <h3 className="text-xl font-semibold mb-3">Pi Price Converter</h3>
-                        <p className="text-4xl font-extrabold text-green-600 mb-4">1 Pi ≈ $31.41 (Dummy)</p>
-                        <input type="number" placeholder="Pi Amount" className="w-full p-3 border rounded-lg" />
-                        <p className="mt-2 text-lg font-medium text-gray-700">₹ 85,000 INR (Approx)</p>
-                    </div>
-                    
-                    <div className="bg-white p-6 rounded-lg shadow-md col-span-2">
-                        <h3 className="text-xl font-semibold mb-3">Historical Price Chart (Dummy)</h3>
-                        <div className="h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-500">
-                            [Interactive Price Chart Placeholder - D3.js can be used here]
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6 mb-8">
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <h3 className="text-xl font-semibold mb-3">Pi Market News (Dummy)</h3>
-                        <ul className="text-sm text-gray-700 list-disc list-inside space-y-1">
-                            <li>New KYC update released globally.</li>
-                            <li>Barter-Pi sees 20% growth in transactions.</li>
-                            <li>AI-Generated summary of weekly trends.</li>
-                        </ul>
-                    </div>
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <h3 className="text-xl font-semibold mb-3">AI Listing Recommendation (Dummy)</h3>
-                        <p className="text-sm text-gray-700">Gemini suggests you list 'Old Bicycle' soon, as local demand is high.</p>
-                        <button className="mt-3 text-indigo-600 text-sm hover:underline">Generate Pricing Report</button>
-                    </div>
-                </div>
-
-                <div className="mt-8 pt-4 border-t border-dashed border-indigo-200">
-                    <h3 className="text-xl font-semibold text-indigo-800 mb-3">Gemini Chatbot Assistant</h3>
-                    <div className="bg-white h-40 p-4 rounded-lg overflow-y-scroll mb-3">
-                        <p className="text-gray-500">AI: मैं आपके Barter-Pi सवालों और लिस्टिंग बनाने में मदद कर सकता हूँ।</p>
-                        <p className="text-right text-sm text-gray-700">मुझे अपनी लिस्टिंग का विवरण बताओ।</p>
-                    </div>
-                    <div className="flex space-x-2">
-                        <input type="text" placeholder="AI से सवाल पूछें..." className="flex-grow p-3 border rounded-lg" />
-                        <button className="bg-indigo-600 text-white p-3 rounded-lg hover:bg-indigo-700">Ask</button>
-                    </div>
-                </div>
-            </div>
-        );
-
-        // --- Admin Page ---
-        const AdminPage = () => {
-            const isAdmin = DUMMY_USER_ID === ADMIN_ID; 
             return (
-                <div className="p-4 sm:p-8 bg-red-50 rounded-xl shadow-lg border border-red-300">
-                    <h2 className="text-2xl font-bold text-red-700 mb-4">Admin / Moderator Panel</h2>
-                    {isAdmin ? (
-                        <div className="space-y-4">
-                            <p className="text-green-700 font-semibold text-lg">✅ Access Granted: Welcome Admin!</p>
-                            <div className="bg-white p-4 rounded-lg shadow-sm">
-                                <p className="font-medium mb-2">Platform Metrics (Dummy)</p>
-                                <p>Total Users: 10,000+ | Open Disputes: 3</p>
-                                <p>Pending Approvals: 15 (Dummy)</p>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+                    <h2 className="text-3xl font-bold text-indigo-600 border-b pb-3">ऑर्डर और ट्रैकिंग</h2>
+                    
+                    {/* Buying Orders */}
+                    <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">📦 मेरे ख़रीदे गए ऑर्डर्स ({myOrders.length})</h3>
+                        
+                        {myOrders.length > 0 ? myOrders.map(order => (
+                            <div key={order.id} className="mb-4 p-4 border border-gray-100 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center bg-blue-50 hover:shadow-md transition">
+                                <div>
+                                    <p className="font-semibold text-lg">{order.item}</p>
+                                    <p className="text-sm text-gray-500">कीमत: **{order.price} Pi** | ट्रैकिंग: {order.tracking}</p>
+                                    <p className="text-xs text-gray-400">Delivery Type: {order.delivery}</p>
+                                </div>
+                                <div className="text-right mt-2 sm:mt-0">
+                                    <span className={`px-3 py-1 text-sm font-bold rounded-full block ${order.status === 'Delivered' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-gray-900'}`}>
+                                        {order.status}
+                                    </span>
+                                    {order.status === 'Delivered' ? (
+                                        <button className="mt-1 text-indigo-600 text-sm hover:underline block">रिव्यू लिखें</button>
+                                    ) : (
+                                        <button className="mt-1 text-red-600 text-sm hover:underline block">कैंसिल करें</button>
+                                    )}
+                                </div>
                             </div>
-                            <button className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700">
-                                Review Flagged Listings
-                            </button>
-                        </div>
-                    ) : (
-                        <p className="text-lg text-red-600 font-medium">
-                            ⛔ Access Denied: आपको यह पैनल देखने की अनुमति नहीं है।
-                        </p>
-                    )}
+                        )) : <p className="text-gray-500">कोई ख़रीदा गया ऑर्डर नहीं मिला।</p>}
+                    </div>
+
+                    {/* Selling Orders */}
+                    <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">📤 मेरे बेचे गए ऑर्डर्स ({sellingOrders.length})</h3>
+                        
+                        {sellingOrders.length > 0 ? sellingOrders.map(order => (
+                             <div key={order.id} className="mb-4 p-4 border border-gray-100 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center bg-green-50 hover:shadow-md transition">
+                                <div>
+                                    <p className="font-semibold text-lg">{order.item}</p>
+                                    <p className="text-sm text-gray-500">कीमत: **{order.price} Pi** | Buyer ID: {order.buyer}</p>
+                                    <p className="text-xs text-gray-400">Status: {order.status}</p>
+                                </div>
+                                <div className="text-right mt-2 sm:mt-0">
+                                    <button className="bg-indigo-600 text-white py-2 px-4 rounded-lg text-sm font-semibold hover:bg-indigo-700">
+                                        ट्रैकिंग अपडेट करें
+                                    </button>
+                                </div>
+                            </div>
+                        )) : <p className="text-gray-500">कोई बेचा गया ऑर्डर नहीं मिला।</p>}
+                    </div>
                 </div>
             );
         };
-        // --- Main App Logic ---
+        
+        // --- AI Helper Page ---
+        const AIHelperPage = () => {
+            const [input, setInput] = useState('');
+            const [messages, setMessages] = useState([
+                { sender: 'AI', text: 'नमस्ते! मैं Barter-Pi Pro का **Gemini AI** असिस्टेंट हूँ। मैं लिस्टिंग बनाने, Pi मूल्य निर्धारण या ट्रेडिंग के नियमों में आपकी मदद कर सकता हूँ। आप क्या जानना चाहेंगे?' }
+            ]);
+
+            const handleSend = (e) => {
+                e.preventDefault();
+                if (input.trim() === '') return;
+
+                const newMessage = { sender: 'User', text: input.trim() };
+                setMessages([...messages, newMessage]);
+                setInput('');
+
+                // Dummy AI Response
+                setTimeout(() => {
+                    const aiResponse = { sender: 'AI', text: `यह एक डमी AI प्रतिक्रिया है: आपने पूछा "${newMessage.text}"। Pi बार्टरिंग के लिए, हम हमेशा **Escrow** का उपयोग करने की सलाह देते हैं!` };
+                    setMessages(msgs => [...msgs, aiResponse]);
+                }, 1500);
+            };
+
+            return (
+                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="p-6 bg-white rounded-xl shadow-lg h-[650px] flex flex-col border border-indigo-200">
+                        <h2 className="text-2xl font-bold text-indigo-600 mb-4 border-b pb-2">🤖 AI हेल्पर (Gemini Pro)</h2>
+                        <div className="flex-grow bg-gray-50 p-4 rounded-lg overflow-y-scroll space-y-4 mb-4">
+                            {messages.map((msg, index) => (
+                                <div key={index} className={`flex ${msg.sender === 'User' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-lg p-3 rounded-xl shadow-md ${
+                                        msg.sender === 'User' ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-gray-200 text-gray-800 rounded-tl-none'
+                                    }`}>
+                                        {msg.text}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <form onSubmit={handleSend} className="flex space-x-2">
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder="Gemini से प्रश्न पूछें..."
+                                className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                            <button type="submit" className="bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700 transition">
+                                Send <span role="img" aria-label="Rocket">🚀</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+        
+        // --- Admin Page ---
+        const AdminPage = () => {
+            const activeListings = DUMMY_LISTINGS.filter(l => l.status === 'Active').length;
+            const pendingReviews = DUMMY_LISTINGS.filter(l => l.status === 'Pending').length;
+            const totalOrders = DUMMY_ORDERS.length;
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+                    <h2 className="text-3xl font-bold text-red-600 border-b pb-3">🚨 एडमिन डैशबोर्ड (PRO Access)</h2>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-indigo-600">
+                            <p className="text-sm text-gray-500">कुल सक्रिय लिस्टिंग</p>
+                            <p className="text-3xl font-extrabold text-indigo-600 mt-1">{activeListings}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-yellow-600">
+                            <p className="text-sm text-gray-500">पेंडिंग मॉडरेटर समीक्षा</p>
+                            <p className="text-3xl font-extrabold text-yellow-600 mt-1">{pendingReviews}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-green-600">
+                            <p className="text-sm text-gray-500">पूर्ण/लंबित ऑर्डर्स</p>
+                            <p className="text-3xl font-extrabold text-green-600 mt-1">{totalOrders}</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl shadow-lg">
+                        <h3 className="text-xl font-semibold text-gray-800 mb-4">समीक्षा के लिए पेंडिंग लिस्टिंग्स</h3>
+                        <ul className="space-y-3">
+                            {DUMMY_LISTINGS.filter(l => l.status === 'Pending').map(l => (
+                                <li key={l.id} className="p-3 border rounded-lg flex justify-between items-center bg-yellow-50">
+                                    <span className="font-medium">{l.itemName} ({l.pricePi} Pi)</span>
+                                    <div>
+                                        <button className="text-green-600 hover:text-green-800 text-sm font-semibold mr-3">स्वीकृत करें</button>
+                                        <button className="text-red-600 hover:text-red-800 text-sm font-semibold">अस्वीकृत करें</button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App Component ---
         const App = () => {
-            const [currentPage, setCurrentPage] = React.useState('Home');
+            const [currentPage, setCurrentPage] = useState('Home');
 
             const renderPage = () => {
                 switch (currentPage) {
                     case 'Home':
-                        return <HomePage />;
+                        return <HomePage setPage={setCurrentPage} />;
                     case 'Chat':
                         return <ChatPage />;
                     case 'Orders':
                         return <OrdersPage />;
-                    case 'Admin':
-                        return <AdminPage />;
                     case 'AIHelper':
                         return <AIHelperPage />;
+                    case 'Admin':
+                        return <AdminPage />;
                     default:
-                        return <HomePage />;
+                        return <HomePage setPage={setCurrentPage} />;
                 }
             };
 
             return (
-                <div className="min-h-screen bg-gray-50">
+                <div className="min-h-screen">
                     <Header currentPage={currentPage} setPage={setCurrentPage} />
-                    <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+                    <main className="pb-10">
                         {renderPage()}
                     </main>
+                    <footer className="bg-white border-t p-4 text-center text-sm text-gray-500">
+                        Barter-Pi Pro | सुरक्षित Pi बार्टरिंग के लिए निर्मित | Pi Network Escrow समर्थित (Dummy)
+                    </footer>
                 </div>
             );
-        }
+        };
 
-        // App को DOM में रेंडर करें
-        const container = document.getElementById('root');
-        const root = ReactDOM.createRoot(container);
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
     </script>
 </body>
 </html>
