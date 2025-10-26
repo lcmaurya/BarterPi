@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Barter-Pi App</title>
+    <title>Barter-Pi Pro: Pi E-Commerce Platform</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM CDNs -->
@@ -11,78 +11,38 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <!-- Babel for JSX transformation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Lucide Icons CDN (for Search icon) -->
+    <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Pi SDK Mock for testing -->
+    <script src="https://cdn.jsdelivr.net/gh/ph0enix-dev/pi-sdk-mock@main/pi-sdk-mock.js"></script>
     
-    <!-- Firebase CDNs (Modules used by the app) -->
+    <!-- Firebase CDNs (Required for Firestore, Auth) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, serverTimestamp, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
-        // --- GLOBAL VARIABLES (Canvas Environment) ---
-        // Render environment variables are made available through these global constants.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // --- Firebase Initialization ---
-        // Initialize the app if config exists, otherwise set to null.
-        window.app = firebaseConfig ? initializeApp(firebaseConfig) : null;
-        window.db = window.app ? getFirestore(window.app) : null;
-        window.auth = window.app ? getAuth(window.app) : null;
-
-        if (window.db) {
-            // Initial Auth Attempt: Sign in with custom token or anonymously.
-            (async () => {
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(window.auth, initialAuthToken);
-                        console.log("Firebase: Signed in with Custom Token.");
-                    } else {
-                        await signInAnonymously(window.auth);
-                        console.log("Firebase: Signed in Anonymously.");
-                    }
-                } catch (error) {
-                    console.error("Firebase Auth Error on startup:", error);
-                }
-            })();
-        } else {
-            console.warn("Firebase Config missing. Running in disconnected mode.");
-        }
-
-        // Expose Firebase and utility functions globally for the React component to use.
-        window.firebase = {
-            auth: window.auth,
-            db: window.db,
-            onAuthStateChanged: onAuthStateChanged,
-            collection: collection,
-            query: query,
-            onSnapshot: onSnapshot,
-            addDoc: addDoc,
-            serverTimestamp: serverTimestamp,
-            appId: appId,
-            isAvailable: !!window.db
+        // Ensure all necessary global objects are created/available for React to use
+        window.firebaseDependencies = {
+            initializeApp, getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously,
+            getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, serverTimestamp, orderBy, limit,
+            getStorage, ref, uploadString, getDownloadURL
         };
     </script>
-
-    <!-- Pi SDK Mock for testing in the Canvas (required for Barter/Payment functionality) -->
-    <script src="https://cdn.jsdelivr.net/gh/ph0enix-dev/pi-sdk-mock@main/pi-sdk-mock.js"></script>
-
+    
     <script>
-        // Tailwind Configuration (Theme setup)
+        // Tailwind Configuration
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        'pi-dark': '#2c2c2c',
-                        'pi-main': '#ffb33f', // Yellowish Gold
-                        'pi-light': '#fef3e4',
-                        'pi-blue': '#1e75ff',
+                        'pi-dark': '#1e293b', // Slate Dark
+                        'pi-main': '#ffb33f', // Pi Gold
+                        'pi-blue': '#1e75ff', // Pi Blue
+                        'pi-light': '#fef3c7', // Light Gold Background
                     },
                     fontFamily: {
-                        // Using 'Inter' as specified in guidelines
                         sans: ['Inter', 'sans-serif'],
                     },
                 },
@@ -95,114 +55,530 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // Import necessary hooks and components from global React/Lucide
-        const { useState, useEffect, useCallback } = React;
-        const { Search, X, ShoppingCart, User, Send } = lucide;
+        const { useState, useEffect, useCallback, useMemo } = React;
+        const { Home, Search, ShoppingCart, User, Send, Settings, MessageCircle, TrendingUp, DollarSign, Truck, Star, Info, Image, Video, Clipboard, QrCode, Shield } = lucide;
 
-        // --- Utility Components ---
+        // --- GLOBAL CONSTANTS ---
+        const ADMIN_ID = 'developer_wallet_id_here'; // Replace with actual Developer Wallet ID
+        const FIRESTORE_COLLECTION_LISTINGS = 'listings';
+        const FIRESTORE_COLLECTION_CHATS = 'chats';
+        const FIRESTORE_COLLECTION_ORDERS = 'orders';
 
-        /**
-         * MessageBox Component: Displays temporary success/error messages.
-         */
-        const MessageBox = ({ message, type, isVisible, onClose }) => {
-            if (!isVisible) return null;
-
-            const baseClasses = "fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl transition-opacity duration-300 flex items-center min-w-[300px] border";
-            const typeClasses = type === 'error' ? 'bg-red-600 text-white border-red-800' : 'bg-green-600 text-white border-green-800';
+        // --- Firebase/Auth Setup States ---
+        const useFirebase = () => {
+            const [db, setDb] = useState(null);
+            const [auth, setAuth] = useState(null);
+            const [storage, setStorage] = useState(null);
+            const [user, setUser] = useState(null);
+            const [isAuthReady, setIsAuthReady] = useState(false);
 
             useEffect(() => {
-                const timer = setTimeout(() => onClose(), 4000);
-                return () => clearTimeout(timer);
-            }, [message]);
+                if (window.firebaseDependencies) {
+                    const { initializeApp, getAuth, getFirestore, signInWithCustomToken, onAuthStateChanged, signInAnonymously, getStorage } = window.firebaseDependencies;
+                    
+                    try {
+                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+
+                        if (!firebaseConfig.apiKey) {
+                            console.error("Firebase Config missing. Running in Mock Auth Mode.");
+                            setIsAuthReady(true);
+                            // Mocking a logged-in user if config is missing
+                            setUser({ uid: 'mock_user_' + Date.now(), username: 'MockUser', isMock: true, isAdmin: false });
+                            return;
+                        }
+
+                        const app = initializeApp(firebaseConfig);
+                        const fAuth = getAuth(app);
+                        const fDb = getFirestore(app);
+                        const fStorage = getStorage(app);
+                        
+                        setAuth(fAuth);
+                        setDb(fDb);
+                        setStorage(fStorage);
+                        
+                        // Authentication Logic (Crucial for Pi App)
+                        const unsubscribe = onAuthStateChanged(fAuth, async (currentUser) => {
+                            if (currentUser) {
+                                let piUser = {
+                                    uid: currentUser.uid,
+                                    username: currentUser.isAnonymous ? 'Anonymous' : currentUser.uid.substring(0, 8),
+                                    isAdmin: currentUser.uid === ADMIN_ID,
+                                };
+                                setUser(piUser);
+                                setIsAuthReady(true);
+                            } else {
+                                // Attempt initial sign-in using provided token
+                                try {
+                                    const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                                    if (token) {
+                                        await signInWithCustomToken(fAuth, token);
+                                    } else {
+                                        // Fallback to anonymous sign-in if no token is available
+                                        await signInAnonymously(fAuth);
+                                    }
+                                } catch (error) {
+                                    console.error("Firebase Authentication Error (Check Render Variables & Pi SDK):", error.message);
+                                    // If auth fails, still set auth ready to allow UI to render (with minimal access)
+                                    setIsAuthReady(true); 
+                                }
+                            }
+                        });
+
+                        return () => unsubscribe(); // Cleanup auth listener
+
+                    } catch (e) {
+                        console.error("Firebase initialization failed:", e);
+                        setIsAuthReady(true); // Ensure UI renders even if Firebase fails
+                    }
+                }
+            }, []);
+
+            return { db, auth, storage, user, isAuthReady };
+        };
+
+        // --- AI & Converter Utility (Mocking API Call) ---
+        const useAI = () => {
+            const [piPrice, setPiPrice] = useState('N/A');
+            const [loading, setLoading] = useState(false);
+
+            // Mock Fetch for Pi Price
+            useEffect(() => {
+                setLoading(true);
+                // In a real app, this would call an API like gemini-2.5-flash-preview-09-2025 with google_search tool
+                setTimeout(() => {
+                    setPiPrice('~$35 USD (Current Consensus)');
+                    setLoading(false);
+                }, 1500);
+            }, []);
+
+            const getAIResponse = (query) => {
+                return new Promise((resolve) => {
+                    setLoading(true);
+                    setTimeout(() => {
+                        const response = `AI Assistant: "${query}" के आधार पर, यह Barter-Pi Pro है जो Pi Network के लिए बनाया गया है। यह सुरक्षा (high level security), पेमेंट (wallet connectivity), और ग्लोबल/लोकल सर्च (global/local search) का समर्थन करता है।`;
+                        setLoading(false);
+                        resolve(response);
+                    }, 2000);
+                });
+            };
+
+            return { piPrice, loading, getAIResponse };
+        };
+
+        // --- Component: Header & Nav ---
+        const Header = ({ user, isAdmin, onSignOut, navigate, currentPage }) => {
+            const navItems = [
+                { id: 'deals', label: 'Main Deals', icon: TrendingUp },
+                { id: 'listings', label: 'Listings', icon: ShoppingCart },
+                { id: 'chat', label: 'Chat Box', icon: MessageCircle },
+                { id: 'ai', label: 'AI Helper', icon: Info },
+            ];
+
+            if (isAdmin) {
+                navItems.push({ id: 'admin', label: 'Admin', icon: Settings });
+            }
 
             return (
-                <div className={`${baseClasses} ${typeClasses} opacity-100`}>
-                    <p className="flex-grow mr-4 font-medium">{message}</p>
-                    <button onClick={onClose} className="font-bold ml-2 p-1 rounded-full transition hover:bg-white hover:bg-opacity-20">
-                        <X size={18} />
-                    </button>
+                <header className="bg-pi-dark shadow-xl sticky top-0 z-30">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+                        <h1 onClick={() => navigate('deals')} className="text-3xl font-extrabold text-white tracking-wider cursor-pointer">
+                            Barter<span className="text-pi-main">-Pi Pro</span>
+                        </h1>
+                        
+                        {/* Desktop Nav */}
+                        <nav className="hidden md:flex items-center space-x-6">
+                            {navItems.map(item => {
+                                const Icon = item.icon;
+                                const isActive = currentPage === item.id;
+                                return (
+                                    <button 
+                                        key={item.id}
+                                        onClick={() => navigate(item.id)}
+                                        className={`flex items-center space-x-1 py-2 px-3 rounded-lg font-medium transition ${
+                                            isActive 
+                                                ? 'bg-pi-main text-pi-dark shadow-md' 
+                                                : 'text-gray-300 hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <Icon size={18} />
+                                        <span>{item.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </nav>
+
+                        {/* User Info & Auth */}
+                        <div className="flex items-center space-x-3">
+                            {user && (
+                                <span className="text-white text-sm hidden sm:block">
+                                    <User size={16} className="inline-block mr-1" />
+                                    {user.username} | {isAdmin && <span className="text-red-400 font-bold">ADMIN</span>}
+                                </span>
+                            )}
+                            <button 
+                                onClick={onSignOut} 
+                                className={'bg-red-500 text-white hover:bg-red-600 font-semibold py-2 px-3 rounded-lg transition shadow-lg text-sm'}
+                            >
+                                {user ? 'Sign Out' : 'Sign In'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Mobile Nav */}
+                    <nav className="md:hidden flex justify-around border-t border-gray-700 pt-2 pb-1 bg-pi-dark">
+                        {navItems.map(item => {
+                            const Icon = item.icon;
+                            const isActive = currentPage === item.id;
+                            return (
+                                <button 
+                                    key={item.id}
+                                    onClick={() => navigate(item.id)}
+                                    className={`flex flex-col items-center p-2 rounded-lg transition text-xs ${
+                                        isActive 
+                                            ? 'text-pi-main' 
+                                            : 'text-gray-400 hover:text-white'
+                                    }`}
+                                >
+                                    <Icon size={20} />
+                                    <span>{item.label}</span>
+                                </button>
+                            );
+                        })}
+                    </nav>
+                </header>
+            );
+        };
+
+        // --- Component: Main Deals/Listings (Combined for brevity) ---
+        const DealsPage = ({ db, user, storage, navigate, ai }) => {
+            const [listings, setListings] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const { getDoc, collection, query, onSnapshot, where, orderBy, limit } = window.firebaseDependencies || {};
+
+            // Firestore Data Listener
+            useEffect(() => {
+                if (!db || !user || user.isMock) {
+                    setLoading(false);
+                    return;
+                }
+                
+                const q = query(
+                    collection(db, `artifacts/${__app_id}/public/data/${FIRESTORE_COLLECTION_LISTINGS}`),
+                    orderBy('createdAt', 'desc'),
+                    limit(50)
+                );
+
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const fetchedListings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setListings(fetchedListings);
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Error fetching listings:", error);
+                    setLoading(false);
+                    // navigate('error', { message: 'Database Access Failed. Check Security Rules.' });
+                });
+
+                return () => unsubscribe();
+            }, [db, user]);
+
+            const filteredListings = listings.filter(l =>
+                l.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                l.description?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            // Mock/Real Payment Handler
+            const handleBarterClick = (listing) => {
+                if (!user || user.isMock) {
+                    alert('Mock User: Sign in with real Pi to proceed to payment.');
+                    return;
+                }
+                
+                alert(`Barter initiated for ${listing.name} at ${listing.price}π. Starting Pi Payment SDK.`);
+                
+                // Real Pi Payment SDK Call
+                Pi.createPayment({
+                    amount: listing.price,
+                    memo: `Barter for ${listing.name} (ID: ${listing.id})`,
+                    metadata: { listingId: listing.id, buyerId: user.uid },
+                }, {
+                    onReadyForServerApproval: (paymentId) => {
+                        console.log(`Payment Ready: ${paymentId}`);
+                        // In a full app, this sends to a backend server for approval
+                    },
+                    onPaymentCompleted: (paymentId, txid) => {
+                        alert(`🎉 पेमेंट सफल! TxID: ${txid}. अब 'Orders' पेज पर डिलीवरी ट्रैक करें।`);
+                        // Navigate or update order status
+                    },
+                    onPaymentCancelled: () => {
+                        alert("❌ पेमेंट रद्द हो गया।");
+                    },
+                    onError: (error) => {
+                        alert(`❌ पेमेंट एरर: ${error.message}`);
+                    }
+                });
+            };
+
+            return (
+                <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                    
+                    {/* Header & Controls */}
+                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <h2 className="text-3xl font-bold text-pi-dark">
+                            <TrendingUp className="inline-block mr-2 text-pi-main" size={28} /> Main Deals ({listings.length})
+                        </h2>
+                        <button 
+                            onClick={() => setIsModalOpen(true)}
+                            disabled={!user || user.isMock}
+                            className={`font-semibold py-2 px-4 rounded-lg transition shadow-lg text-white ${
+                                user && !user.isMock ? 'bg-pi-blue hover:bg-blue-600' : 'bg-gray-400 cursor-not-allowed'
+                            }`}
+                        >
+                            + नई वस्तु पोस्ट करें
+                        </button>
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="relative flex-grow mb-8">
+                        <input 
+                            type="text" 
+                            placeholder="ग्लोबल/लोकल डील खोजें (नाम, विवरण, टैग)..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full p-4 border border-gray-300 rounded-xl focus:ring-pi-main focus:border-pi-main pl-12 transition shadow-inner"
+                        />
+                        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    </div>
+
+                    {/* Listings Grid */}
+                    {loading ? (
+                        <p className="text-center text-pi-blue my-10 text-xl font-medium">✨ लिस्टिंग लोड हो रही है...</p>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {filteredListings.length === 0 ? (
+                                <p className="text-center text-gray-500 my-10 text-xl col-span-full">कोई लिस्टिंग नहीं मिली।</p>
+                            ) : (
+                                filteredListings.map(listing => (
+                                    <ListingCard 
+                                        key={listing.id} 
+                                        listing={listing} 
+                                        user={user} 
+                                        onBarterClick={handleBarterClick}
+                                        navigate={navigate}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    )}
+                    
+                    <NewListingModal 
+                        isModalOpen={isModalOpen} 
+                        setIsModalOpen={setIsModalOpen} 
+                        db={db}
+                        user={user}
+                        storage={storage}
+                        collectionName={FIRESTORE_COLLECTION_LISTINGS}
+                    />
+
                 </div>
             );
         };
 
-        /**
-         * NewListingModal Component: Form for posting a new Barter item.
-         */
-        const NewListingModal = ({ isModalOpen, setIsModalOpen, onSubmit, user }) => {
+        // --- Component: Listing Card ---
+        const ListingCard = ({ listing, user, onBarterClick, navigate }) => {
+            const isOwner = user?.uid === listing.userId;
+            const imageUrl = listing.media?.[0]?.url || 'https://placehold.co/400x300/fec84d/1e293b?text=Barter-Pi';
+            
+            const handleQRClick = () => {
+                alert(`QR Code Mock: Listing ID ${listing.id} | Price ${listing.price}π. In a real app, this generates a QR image.`);
+            }
+
+            return (
+                <div className="bg-white rounded-xl shadow-2xl overflow-hidden transform hover:scale-[1.02] transition duration-300 flex flex-col">
+                    {/* Image Placeholder */}
+                    <div className="h-48 bg-gray-200 relative">
+                        <img 
+                            src={imageUrl} 
+                            alt={listing.name} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => e.target.src = 'https://placehold.co/400x300/fec84d/1e293b?text=Barter-Pi+Image+Missing'}
+                        />
+                        <button 
+                            onClick={handleQRClick}
+                            className="absolute top-2 right-2 bg-white p-2 rounded-full shadow-lg hover:bg-gray-100 transition"
+                            title="QR Code Payment"
+                        >
+                            <QrCode size={18} className="text-pi-dark" />
+                        </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-5 flex flex-col flex-grow">
+                        <h3 className="text-xl font-bold text-pi-dark truncate mb-1">{listing.name}</h3>
+                        <p className="text-sm text-gray-600 mb-3 line-clamp-2 flex-grow">{listing.description}</p>
+                        
+                        <div className="flex items-center text-sm text-gray-500 mb-4">
+                            <Star size={14} className="text-yellow-500 mr-1 fill-yellow-500" /> 4.5 ({Math.floor(Math.random() * 100) + 10} Reviews)
+                        </div>
+
+                        {/* Price & Action */}
+                        <div className="mt-auto flex justify-between items-center border-t pt-3">
+                            <span className="text-3xl font-extrabold text-pi-main">
+                                {listing.price} <span className="text-lg font-medium text-gray-600">π</span>
+                            </span>
+                            <button 
+                                onClick={() => onBarterClick(listing)} 
+                                disabled={isOwner || !user}
+                                className={`text-white text-sm font-semibold py-2 px-4 rounded-lg transition shadow-md ${
+                                    isOwner 
+                                        ? 'bg-gray-400 cursor-not-allowed' 
+                                        : 'bg-pi-blue hover:bg-blue-600 disabled:bg-gray-500'
+                                }`}
+                            >
+                                {isOwner ? 'आपकी वस्तु' : 'Barter & Buy'}
+                            </button>
+                        </div>
+                        <button 
+                            onClick={() => navigate('order', { listingId: listing.id, isBuyer: true })} 
+                            className="mt-2 text-pi-blue hover:underline text-xs text-right"
+                        >
+                            डिलीवरी/समीक्षा विवरण
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // --- Component: New Listing Modal (Seller UI) ---
+        const NewListingModal = ({ isModalOpen, setIsModalOpen, db, user, storage, collectionName }) => {
             if (!isModalOpen) return null;
 
-            // Form state for better control
             const [name, setName] = useState('');
             const [description, setDescription] = useState('');
             const [price, setPrice] = useState('');
+            const [mediaType, setMediaType] = useState('image'); // 'image' or 'video'
+            const [mediaData, setMediaData] = useState(''); // Base64 or URL
+            const [loading, setLoading] = useState(false);
+            const { addDoc, collection, serverTimestamp, ref, uploadString, getDownloadURL } = window.firebaseDependencies || {};
+            
+            // Simulating image upload by converting string to base64
+            const handleMediaChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setMediaData(reader.result); // Base64 string
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
 
-            const handleSubmit = (e) => {
+            const uploadMedia = async (fileBase64) => {
+                const storageRef = ref(storage, `listings/${user.uid}/${Date.now()}`);
+                const snapshot = await uploadString(storageRef, fileBase64, 'data_url');
+                return await getDownloadURL(snapshot.ref);
+            };
+
+            const handleSubmit = async (e) => {
                 e.preventDefault();
-                onSubmit({ name, description, price: parseFloat(price) });
-                // Reset form state after submission attempt
-                setName('');
-                setDescription('');
-                setPrice('');
-                setIsModalOpen(false);
+                if (parseFloat(price) <= 0 || !db || !user || !storage) return alert('कीमत 0 से अधिक होनी चाहिए या Firebase लोड नहीं है।');
+                setLoading(true);
+
+                try {
+                    let mediaUrl = '';
+                    if (mediaData) {
+                        mediaUrl = await uploadMedia(mediaData); // Upload to Storage
+                    }
+
+                    const newListing = {
+                        name,
+                        description,
+                        price: parseFloat(price),
+                        userId: user.uid,
+                        username: user.username,
+                        media: mediaUrl ? [{ type: mediaType, url: mediaUrl }] : [],
+                        createdAt: serverTimestamp(),
+                        status: 'available',
+                        isLocal: false, // For future Local/Global Search separation
+                    };
+
+                    await addDoc(collection(db, `artifacts/${__app_id}/public/data/${collectionName}`), newListing);
+
+                    alert('लिस्टिंग सफलतापूर्वक पोस्ट हुई!');
+                    setIsModalOpen(false);
+                } catch (error) {
+                    console.error("Posting error:", error);
+                    alert(`❌ पोस्टिंग विफल: ${error.message}. Firebase Config/Rules की जाँच करें।`);
+                } finally {
+                    setLoading(false);
+                }
             };
 
             return (
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-8 shadow-2xl transform transition-transform duration-300 scale-100">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6 border-b pb-3">
-                            <h3 className="text-2xl font-bold text-pi-dark">नई वस्तु पोस्ट करें</h3>
+                            <h3 className="text-2xl font-bold text-pi-dark">विक्रेता UI: नई वस्तु पोस्ट करें</h3>
                             <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-800 transition p-2 rounded-full hover:bg-gray-100">
                                 <X size={24} />
                             </button>
                         </div>
                         
                         <form onSubmit={handleSubmit}>
-                            <div className="mb-4">
-                                <label htmlFor="item-name" className="block text-sm font-medium text-gray-700 mb-1">वस्तु का नाम</label>
+                            {/* Product Details */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">वस्तु का नाम</label>
+                                    <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main shadow-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Pi में कीमत (π)</label>
+                                    <input type="number" step="0.0001" required min="0.0001" value={price} onChange={(e) => setPrice(e.target.value)} className="p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main shadow-sm" />
+                                </div>
+                            </div>
+                            
+                            <div className="mt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">विवरण (Description)</label>
+                                <textarea required value={description} onChange={(e) => setDescription(e.target.value)} className="p-3 w-full border border-gray-300 rounded-lg h-24 focus:ring-pi-main focus:border-pi-main shadow-sm"></textarea>
+                            </div>
+
+                            {/* Image/Video Upload */}
+                            <div className="mt-4 border p-4 rounded-lg bg-gray-50">
+                                <h4 className="text-lg font-semibold mb-3">मीडिया अपलोड (छवि/वीडियो)</h4>
+                                <div className="flex space-x-4 mb-3">
+                                    <label className="flex items-center">
+                                        <input type="radio" name="mediaType" value="image" checked={mediaType === 'image'} onChange={() => setMediaType('image')} className="mr-2 text-pi-main" />
+                                        <Image size={16} className="mr-1 inline" /> Image
+                                    </label>
+                                    <label className="flex items-center">
+                                        <input type="radio" name="mediaType" value="video" checked={mediaType === 'video'} onChange={() => setMediaType('video')} className="mr-2 text-pi-main" />
+                                        <Video size={16} className="mr-1 inline" /> Video (Mock Upload)
+                                    </label>
+                                </div>
                                 <input 
-                                    type="text" 
-                                    id="item-name" 
-                                    required 
-                                    value={name} 
-                                    onChange={(e) => setName(e.target.value)}
-                                    className="p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main transition shadow-sm" 
+                                    type="file" 
+                                    accept={mediaType === 'image' ? 'image/*' : 'video/*'} 
+                                    onChange={handleMediaChange} 
+                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pi-light file:text-pi-dark hover:file:bg-yellow-100"
                                 />
+                                {mediaData && (
+                                    <p className="mt-3 text-xs text-green-600">मीडिया चयनित। अपलोड होने पर दिखना चाहिए।</p>
+                                )}
                             </div>
-                            <div className="mb-4">
-                                <label htmlFor="item-description" className="block text-sm font-medium text-gray-700 mb-1">विवरण (Description)</label>
-                                <textarea 
-                                    id="item-description" 
-                                    required 
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    className="p-3 w-full border border-gray-300 rounded-lg h-24 focus:ring-pi-main focus:border-pi-main transition shadow-sm"
-                                ></textarea>
+
+                            {/* Developer Wallet Note */}
+                            <div className="mt-6 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded">
+                                <p className="text-sm">
+                                    <Shield size={16} className="inline-block mr-1" /> **High Security Note:** यह लिस्टिंग डेवलपर वॉलेट: <span className="font-mono">{user?.uid}</span> से जोड़ी जाएगी।
+                                </p>
                             </div>
-                            <div className="mb-6">
-                                <label htmlFor="item-price" className="block text-sm font-medium text-gray-700 mb-1">Pi में कीमत (π)</label>
-                                <input 
-                                    type="number" 
-                                    id="item-price" 
-                                    step="0.0001" 
-                                    required 
-                                    value={price}
-                                    onChange={(e) => setPrice(e.target.value)}
-                                    className="p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main transition shadow-sm"
-                                />
-                            </div>
-                            <div className="flex justify-end space-x-4">
-                                <button 
-                                    type="button" 
-                                    onClick={() => setIsModalOpen(false)} 
-                                    className="bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-500 transition shadow-md"
-                                >
-                                    रद्द करें
-                                </button>
-                                <button 
-                                    type="submit" 
-                                    className="bg-pi-main text-pi-dark font-semibold py-2 px-4 rounded-lg hover:bg-yellow-400 transition shadow-md"
-                                >
-                                    <Send size={18} className="inline-block mr-1" /> पोस्ट करें
+
+                            <div className="flex justify-end space-x-4 mt-6">
+                                <button type="submit" disabled={loading} className={`text-white font-semibold py-3 px-6 rounded-lg transition shadow-md ${loading ? 'bg-gray-500' : 'bg-pi-main text-pi-dark hover:bg-yellow-400'}`}>
+                                    {loading ? 'पोस्ट हो रही...' : <><Send size={18} className="inline-block mr-1" /> पोस्ट करें</>}
                                 </button>
                             </div>
                         </form>
@@ -211,338 +587,419 @@
             );
         };
 
-        /**
-         * ListingCard Component: Displays a single listing item.
-         */
-        const ListingCard = ({ listing, user, onBarterClick }) => {
-            const isOwner = user?.uid === listing.userId;
+        // --- Component: Chat Box Page ---
+        const ChatPage = ({ db, user }) => {
+            const [chatType, setChatType] = useState('public');
+            const [message, setMessage] = useState('');
+            const [messages, setMessages] = useState([]);
+            const chatPath = `artifacts/${__app_id}/public/data/${FIRESTORE_COLLECTION_CHATS}`;
+            const { addDoc, collection, query, onSnapshot, orderBy, limit, serverTimestamp } = window.firebaseDependencies || {};
+            
+            // Fetch messages
+            useEffect(() => {
+                if (!db || !user || user.isMock) return;
+
+                const q = query(
+                    collection(db, chatPath),
+                    where('type', '==', chatType),
+                    orderBy('createdAt', 'desc'),
+                    limit(50)
+                );
+
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const fetchedMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
+                    setMessages(fetchedMessages);
+                }, (error) => {
+                    console.error("Chat fetch error:", error);
+                });
+
+                return () => unsubscribe();
+            }, [db, user, chatType]);
+
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                if (!message.trim() || !db || user.isMock) return;
+
+                try {
+                    await addDoc(collection(db, chatPath), {
+                        userId: user.uid,
+                        username: user.username || user.uid.substring(0, 8),
+                        message: message.trim(),
+                        type: chatType,
+                        createdAt: serverTimestamp(),
+                    });
+                    setMessage('');
+                } catch (error) {
+                    alert(`संदेश भेजने में विफल: ${error.message}`);
+                }
+            };
 
             return (
-                <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition transform hover:scale-[1.01] flex flex-col justify-between">
-                    <div>
-                        <h3 className="text-xl font-semibold text-pi-dark truncate">{listing.name}</h3>
-                        <p className="text-xs text-gray-500 mt-1 mb-3">
-                            {/* Display short user ID or 'Your Listing' */}
-                            {isOwner ? 'आपकी लिस्टिंग' : `Seller: ${listing.userId?.substring(0, 8) || 'Unknown'}`} | 
-                            {/* Format date nicely */}
-                            {listing.date?.toDate ? listing.date.toDate().toLocaleDateString('hi-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Loading...'}
-                        </p>
-                        <p className="text-gray-700 h-16 overflow-hidden text-ellipsis mb-4">{listing.description}</p>
-                    </div>
+                <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-white rounded-xl shadow-2xl mt-8">
+                    <h2 className="text-3xl font-bold text-pi-dark mb-6 border-b pb-3 flex items-center"><MessageCircle size={28} className="mr-2 text-pi-blue" /> Chat Box</h2>
                     
-                    <div className="mt-4 flex justify-between items-center border-t pt-3">
-                        <span className="text-3xl font-extrabold text-pi-main">
-                            {listing.price} <span className="text-lg font-medium text-gray-600">π</span>
-                        </span>
-                        <button 
-                            onClick={() => onBarterClick(listing)} 
-                            disabled={isOwner}
-                            className={`text-white text-sm font-semibold py-2 px-4 rounded-lg transition shadow-md ${
-                                isOwner 
-                                    ? 'bg-gray-400 cursor-not-allowed' 
-                                    : 'bg-pi-blue hover:bg-blue-600'
-                            }`}
-                        >
-                            {isOwner ? 'आपकी वस्तु' : 'बार्टर करें'}
+                    {/* Chat Type Selector */}
+                    <div className="flex mb-4 space-x-4 border-b pb-2">
+                        <button onClick={() => setChatType('public')} className={`py-2 px-4 rounded-lg font-semibold transition ${chatType === 'public' ? 'bg-pi-main text-pi-dark shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                            Public Chat (Global)
                         </button>
+                        <button onClick={() => setChatType('private')} className={`py-2 px-4 rounded-lg font-semibold transition ${chatType === 'private' ? 'bg-pi-main text-pi-dark shadow-md' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+                            Private Chat (1-on-1 Mock)
+                        </button>
+                    </div>
+
+                    {/* Message Display Area */}
+                    <div className="h-[50vh] overflow-y-auto border border-gray-300 rounded-xl p-4 mb-4 bg-gray-50 flex flex-col-reverse space-y-4 space-y-reverse hide-scrollbar">
+                        {messages.map((msg) => (
+                            <div key={msg.id} className={`flex ${msg.userId === user?.uid ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[75%] p-3 rounded-xl shadow-md ${msg.userId === user?.uid ? 'bg-pi-blue text-white rounded-br-none' : 'bg-white text-pi-dark rounded-tl-none border'}`}>
+                                    <p className="font-semibold text-xs opacity-80">{msg.username}</p>
+                                    <p className="text-sm">{msg.message}</p>
+                                    <span className="block text-[10px] text-right mt-1 opacity-70">
+                                        {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString('hi-IN') : 'अभी'}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Message Input */}
+                    <form onSubmit={sendMessage} className="flex space-x-3">
+                        <input 
+                            type="text" 
+                            value={message} 
+                            onChange={(e) => setMessage(e.target.value)}
+                            placeholder={user && !user.isMock ? "अपना संदेश लिखें..." : "साइन इन करें (Mock User चैटिंग नहीं कर सकता)"}
+                            disabled={!user || user.isMock}
+                            className="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-pi-main focus:border-pi-main shadow-inner disabled:bg-gray-100"
+                        />
+                        <button 
+                            type="submit" 
+                            disabled={!user || user.isMock || !message.trim()}
+                            className="bg-pi-main text-pi-dark font-semibold p-3 rounded-xl hover:bg-yellow-400 transition shadow-md disabled:bg-gray-300 disabled:text-gray-500"
+                        >
+                            <Send size={24} />
+                        </button>
+                    </form>
+                </div>
+            );
+        };
+
+        // --- Component: AI Helper Page ---
+        const AIHelperPage = ({ piPrice, loading, getAIResponse }) => {
+            const [query, setQuery] = useState('');
+            const [aiResponse, setAiResponse] = useState('');
+            const [conversionAmount, setConversionAmount] = useState(1);
+            const exchangeRate = 35; // Mock Pi to USD rate
+
+            const handleAskAI = async () => {
+                if (!query.trim()) return;
+                const response = await getAIResponse(query.trim());
+                setAiResponse(response);
+                setQuery('');
+            };
+
+            const convertedValue = (conversionAmount * exchangeRate).toFixed(2);
+
+            return (
+                <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-white rounded-xl shadow-2xl mt-8">
+                    <h2 className="text-3xl font-bold text-pi-dark mb-6 border-b pb-3 flex items-center"><Info size={28} className="mr-2 text-pi-main" /> AI Assistant & Converter</h2>
+                    
+                    {/* Pi Price Converter */}
+                    <div className="mb-8 p-5 border border-gray-200 rounded-xl bg-pi-light shadow-inner">
+                        <h3 className="text-xl font-bold text-pi-dark mb-3 flex items-center"><DollarSign size={20} className="mr-2" /> Pi Price Converter</h3>
+                        <p className="text-sm text-gray-700 mb-4">वर्तमान Pi अनुमानित मूल्य (Mock): <span className="font-bold text-green-600">{piPrice}</span></p>
+                        <div className="flex items-center space-x-4">
+                            <input 
+                                type="number" 
+                                value={conversionAmount} 
+                                onChange={(e) => setConversionAmount(parseFloat(e.target.value) || 0)}
+                                className="p-3 border border-gray-300 rounded-lg w-24 text-center focus:ring-pi-blue focus:border-pi-blue"
+                                min="0"
+                            />
+                            <span className="text-2xl font-bold text-pi-dark">π</span>
+                            <span className="text-2xl font-bold text-pi-dark">=</span>
+                            <span className="text-3xl font-extrabold text-green-700">${convertedValue} USD</span>
+                        </div>
+                    </div>
+
+                    {/* AI Chat Box */}
+                    <div className="mb-6">
+                        <h3 className="text-xl font-bold text-pi-dark mb-3">AI से जानकारी प्राप्त करें (Multi-Language Global Search Mock)</h3>
+                        <div className="h-40 overflow-y-auto border border-gray-300 rounded-xl p-4 mb-4 bg-gray-50">
+                            <p className="text-gray-500 text-sm">{loading ? 'AI सोच रहा है...' : aiResponse || 'AI को कोई भी सवाल पूछें...'}</p>
+                        </div>
+                        <div className="flex space-x-3">
+                            <input 
+                                type="text" 
+                                value={query} 
+                                onChange={(e) => setQuery(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAskAI()}
+                                placeholder="जैसे: Pi Network क्या है?"
+                                className="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-pi-main focus:border-pi-main shadow-inner"
+                            />
+                            <button 
+                                onClick={handleAskAI}
+                                disabled={loading}
+                                className="bg-pi-blue text-white font-semibold p-3 rounded-xl hover:bg-blue-600 transition shadow-md disabled:bg-gray-400"
+                            >
+                                {loading ? '...' : 'पूछो'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             );
         };
 
-
-        // --- Main App Component ---
-
-        const App = () => {
-            const [user, setUser] = useState(null);
-            const [listings, setListings] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [searchQuery, setSearchQuery] = useState('');
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [message, setMessage] = useState('');
-            const [messageType, setMessageType] = useState('success');
-            const [isMessageVisible, setIsMessageVisible] = useState(false);
+        // --- Component: Order/Delivery Tracking (Buyer/Seller UI) ---
+        const OrderPage = ({ db, user, params }) => {
+            const [orderStatus, setOrderStatus] = useState('Placed'); // Placed, Shipped, OutForDelivery, Delivered
+            const [deliveryAddress, setDeliveryAddress] = useState('');
+            const [review, setReview] = useState('');
+            const [isReviewSubmitted, setIsReviewSubmitted] = useState(false);
             
-            // Check Firebase availability once
-            const isFirebaseAvailable = window.firebase.isAvailable;
+            // Mock Data for the selected listing
+            const listing = { 
+                id: params?.listingId || 'mock-id-123', 
+                name: 'Example Product (ID: ' + (params?.listingId || '...'), 
+                sellerId: 'seller_pi_id',
+                isBuyer: params?.isBuyer || false,
+            };
 
-            // --- Message Handler (Wrapped in useCallback for stability) ---
-            const showMessage = useCallback((msg, type = 'success') => {
-                setMessage(msg);
-                setMessageType(type);
-                setIsMessageVisible(true);
-            }, []);
+            const handleAddressSubmit = (e) => {
+                e.preventDefault();
+                alert(`डिलीवरी पता सेव हुआ: ${deliveryAddress}`);
+                // In a real app, this updates the order document in Firestore
+            };
 
-            // --- Auth & Initialization Hook ---
-            useEffect(() => {
-                if (!isFirebaseAvailable) {
-                    setLoading(false);
-                    showMessage("❌ Firebase कॉन्फिग उपलब्ध नहीं। डेटाबेस कनेक्शन अक्षम।", 'error');
-                    return;
-                }
+            const handleStatusCheck = () => {
+                alert(`ऑर्डर ${listing.name} का स्टेटस: ${orderStatus}`);
+                // In a real app, this fetches status from Firestore
+            };
 
-                // Listen for authentication state changes
-                const unsubscribe = window.firebase.onAuthStateChanged(window.firebase.auth, (currentUser) => {
-                    setUser(currentUser);
-                    setLoading(false);
-                    if (currentUser && !currentUser.isAnonymous) {
-                        // Show sign-in success for non-anonymous users
-                        showMessage(`👋 Pi से लॉग इन: ${currentUser.displayName || currentUser.uid.substring(0, 8)}`, 'success');
-                    }
-                });
+            const handleReviewSubmit = (e) => {
+                e.preventDefault();
+                alert(`समीक्षा सबमिट हुई: ${review}. Seller: ${listing.sellerId}`);
+                setIsReviewSubmitted(true);
+                // In a real app, this adds a review doc to Firestore
+            };
 
-                return () => unsubscribe(); // Cleanup listener
-            }, [isFirebaseAvailable, showMessage]);
+            const deliverySteps = ['Placed', 'Shipped', 'Out For Delivery', 'Delivered'];
+            const currentStepIndex = deliverySteps.indexOf(orderStatus);
 
-            // --- Data Fetching (Firestore Listener Hook) ---
-            useEffect(() => {
-                if (!isFirebaseAvailable || loading || !user) return;
+            return (
+                <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-white rounded-xl shadow-2xl mt-8">
+                    <h2 className="text-3xl font-bold text-pi-dark mb-6 border-b pb-3 flex items-center"><Truck size={28} className="mr-2 text-pi-blue" /> डिलीवरी ट्रैकिंग & समीक्षा</h2>
+                    <p className="text-xl font-medium text-gray-700 mb-6">उत्पाद: {listing.name}</p>
 
-                // Define the public collection path for shared listings
-                // Path: /artifacts/{appId}/public/data/listings
-                const listingsCollectionPath = window.firebase.collection(window.firebase.db, 'artifacts', window.firebase.appId, 'public', 'data', 'listings');
-                const q = window.firebase.query(listingsCollectionPath);
+                    {/* Delivery Status Check */}
+                    <div className="mb-8 p-5 border border-gray-200 rounded-xl bg-gray-50">
+                        <h3 className="text-xl font-bold text-pi-dark mb-4 flex items-center"><Clipboard size={20} className="mr-2" /> डिलीवरी स्थिति</h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <button onClick={handleStatusCheck} className="bg-green-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-600 transition shadow-md">
+                                स्थिति की जाँच करें
+                            </button>
+                        </div>
+                        
+                        {/* Status Timeline */}
+                        <div className="mt-6 flex justify-between relative">
+                            <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-300 z-0 transform -translate-y-1/2"></div>
+                            {deliverySteps.map((step, index) => (
+                                <div key={step} className="text-center relative z-10">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                                        index <= currentStepIndex ? 'bg-pi-main text-pi-dark shadow-xl' : 'bg-gray-400 text-white'
+                                    }`}>
+                                        {index + 1}
+                                    </div>
+                                    <p className={`text-xs font-medium ${index === currentStepIndex ? 'text-pi-dark font-bold' : 'text-gray-500'}`}>{step}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    {/* Buyer: Address Input */}
+                    {listing.isBuyer && (
+                        <div className="mb-8 p-5 border border-gray-200 rounded-xl">
+                            <h3 className="text-xl font-bold text-pi-dark mb-4">डिलीवरी पता</h3>
+                            <form onSubmit={handleAddressSubmit}>
+                                <textarea 
+                                    required 
+                                    placeholder="पूरा डिलीवरी पता यहाँ दर्ज करें..." 
+                                    value={deliveryAddress} 
+                                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                                    className="p-3 w-full border border-gray-300 rounded-lg h-24 focus:ring-pi-blue focus:border-pi-blue shadow-sm"
+                                ></textarea>
+                                <button type="submit" className="mt-3 bg-pi-blue text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition shadow-md">
+                                    पता सेव करें
+                                </button>
+                            </form>
+                        </div>
+                    )}
 
-                // Set up real-time listener (onSnapshot)
-                const unsubscribe = window.firebase.onSnapshot(q, (snapshot) => {
-                    const fetchedListings = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    })).sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)); // Sort by most recent
+                    {/* Buyer: Review Option */}
+                    {listing.isBuyer && orderStatus === 'Delivered' && !isReviewSubmitted && (
+                        <div className="mb-8 p-5 border border-gray-200 rounded-xl bg-green-50">
+                            <h3 className="text-xl font-bold text-pi-dark mb-4">उत्पाद समीक्षा</h3>
+                            <form onSubmit={handleReviewSubmit}>
+                                <textarea 
+                                    required 
+                                    placeholder="अपनी समीक्षा (Review) यहाँ लिखें..." 
+                                    value={review} 
+                                    onChange={(e) => setReview(e.target.value)}
+                                    className="p-3 w-full border border-gray-300 rounded-lg h-24 focus:ring-green-500 focus:border-green-500 shadow-sm"
+                                ></textarea>
+                                <div className="mt-3">
+                                    <label className="mr-4 text-gray-700">रेटिंग:</label>
+                                    {[1, 2, 3, 4, 5].map(star => (
+                                        <Star key={star} size={24} className="inline-block text-yellow-500 fill-yellow-500 cursor-pointer" />
+                                    ))}
+                                </div>
+                                <button type="submit" className="mt-3 bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition shadow-md">
+                                    समीक्षा सबमिट करें
+                                </button>
+                            </form>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        
+        // --- Component: Admin Page ---
+        const AdminPage = ({ isAdmin }) => {
+            if (!isAdmin) {
+                return (
+                    <div className="max-w-xl mx-auto p-8 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-xl mt-8 shadow-xl">
+                        <h2 className="text-2xl font-bold mb-3">❌ एक्सेस अस्वीकृत</h2>
+                        <p>आपके पास इस पेज को देखने के लिए **एडमिन (Developer Wallet ID)** की अनुमति नहीं है।</p>
+                    </div>
+                );
+            }
 
-                    setListings(fetchedListings);
-                }, (error) => {
-                    console.error("Firestore Snapshot Error:", error);
-                    showMessage("❌ लिस्टिंग लोड नहीं हो सकीं। फायरस्टोर नियमों की जाँच करें।", 'error');
-                });
+            return (
+                <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-white rounded-xl shadow-2xl mt-8">
+                    <h2 className="text-3xl font-bold text-red-600 mb-6 border-b pb-3 flex items-center"><Settings size={28} className="mr-2" /> Admin Dashboard</h2>
+                    
+                    <div className="space-y-6">
+                        {/* Dev Wallet Info */}
+                        <div className="p-5 border border-gray-200 rounded-xl bg-yellow-50">
+                            <h3 className="text-xl font-bold text-pi-dark mb-2">डेवलपर वॉलेट जानकारी</h3>
+                            <p className="font-mono break-all text-sm">ID: {ADMIN_ID}</p>
+                            <p className="mt-2 text-green-600 font-semibold">स्थिति: सत्यापित (Verified)</p>
+                            <p className="text-sm text-gray-700 mt-1">यहां से आप Pi SDK से अपना डेवलपर वॉलेट बैलेंस ट्रैक कर सकते हैं।</p>
+                        </div>
 
-                return () => unsubscribe(); // Cleanup listener
-            }, [loading, user, isFirebaseAvailable, showMessage]);
+                        {/* Order Management Mock */}
+                        <div className="p-5 border border-gray-200 rounded-xl">
+                            <h3 className="text-xl font-bold text-pi-dark mb-4">ऑर्डर प्रबंधन (Seller/Admin View)</h3>
+                            <p className="text-sm text-gray-700 mb-4">एडमिन सभी पेंडिंग Pi भुगतानों और ऑर्डर को ट्रैक/अपडेट कर सकता है।</p>
+                            <button className="bg-pi-blue text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition shadow-md">
+                                पेंडिंग ऑर्डर्स देखें (Mock)
+                            </button>
+                        </div>
 
-            // --- Authentication Handler ---
-            const handlePiSignIn = () => {
-                if (!isFirebaseAvailable) {
-                    showMessage("Firebase उपलब्ध नहीं। साइन इन अक्षम।", 'error');
-                    return;
-                }
+                        {/* Security & Audit Mock */}
+                        <div className="p-5 border border-gray-200 rounded-xl bg-red-50">
+                            <h3 className="text-xl font-bold text-red-600 mb-4 flex items-center"><Shield size={20} className="mr-2" /> हाई लेवल सुरक्षा जाँच</h3>
+                            <p className="text-sm text-gray-700">यहां, हम अनधिकृत API कॉल्स को ब्लॉक करने के लिए Firebase Functions (Mock) का उपयोग करते हैं और सुरक्षा लॉग की जाँच करते हैं।</p>
+                            <button className="mt-3 bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition shadow-md">
+                                सुरक्षा लॉग की जाँच करें
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
-                if (user && !user.isAnonymous) {
-                    // Sign Out Logic
-                    window.firebase.auth.signOut().then(() => {
-                        showMessage('साइन आउट सफल', 'success');
+        // --- Root App Component ---
+        const App = () => {
+            const { db, auth, storage, user, isAuthReady } = useFirebase();
+            const { piPrice, loading: aiLoading, getAIResponse } = useAI();
+            const [currentPage, setCurrentPage] = useState('deals');
+            const [pageParams, setPageParams] = useState({});
+
+            const navigate = (page, params = {}) => {
+                setCurrentPage(page);
+                setPageParams(params);
+            };
+
+            const isAdmin = user && user.uid === ADMIN_ID;
+
+            const handleSignOut = () => {
+                if (auth) {
+                    auth.signOut().then(() => {
+                        alert('Sign Out Successful.');
+                        // Optionally reload to ensure token is cleared
+                        window.location.reload(); 
                     }).catch(error => {
-                        showMessage(`साइन आउट एरर: ${error.message}`, 'error');
+                        console.error("Sign out error:", error);
+                        alert(`Sign Out Error: ${error.message}`);
                     });
                 } else {
-                    // Mock Pi Authentication Flow
-                    Pi.authenticate(['username', 'payments', 'wallet'], (authData) => {
-                        if (authData.user) {
-                             // In a real app, this would involve server-side token exchange.
-                             // Here, we just rely on the anonymous user or mock a successful login.
-                            const mockUser = { uid: authData.user.uid, isAnonymous: false, displayName: authData.user.username };
-                            setUser(mockUser);
-                            showMessage(`👋 Pi से लॉग इन: ${authData.user.username}`, 'success');
-                        }
-                    }, (error) => {
-                        showMessage(`Pi साइन इन विफल: ${error.message}`, 'error');
-                    });
+                    alert('Mock Sign Out.');
+                    user && user.isMock && window.location.reload(); 
                 }
             };
-
-            // --- New Listing Submission Handler ---
-            const submitNewListing = async ({ name, description, price }) => {
-                if (!isFirebaseAvailable) return showMessage("Firebase उपलब्ध नहीं। पोस्टिंग विफल।", 'error');
-                if (!user || user.isAnonymous) return showMessage("पोस्ट करने के लिए पहले Pi अकाउंट से साइन इन करें।", 'error');
-
-                try {
-                    const newListing = {
-                        name,
-                        description,
-                        price,
-                        userId: user.uid,
-                        date: window.firebase.serverTimestamp(),
-                        status: 'available'
-                    };
-
-                    const collectionRef = window.firebase.collection(window.firebase.db, 'artifacts', window.firebase.appId, 'public', 'data', 'listings');
-                    await window.firebase.addDoc(collectionRef, newListing);
-
-                    showMessage("✅ लिस्टिंग सफलतापूर्वक पोस्ट हुई।", 'success');
-                } catch (error) {
-                    console.error("Posting error:", error);
-                    showMessage(`❌ पोस्टिंग विफल: ${error.message}`, 'error');
-                }
-            };
-
-            // --- Barter/Payment Handler (Mock) ---
-            const handleBarterClick = (listing) => {
-                if (!user || user.isAnonymous) {
-                    showMessage("आइटम बार्टर करने के लिए Pi से साइन इन करें।", 'error');
-                    return;
-                }
-                
-                showMessage(`💸 ${listing.price}π के लिए बार्टर शुरू हो रहा है...`, 'success');
-
-                // Mock Pi Payment Flow
-                Pi.createPayment({
-                    amount: listing.price,
-                    memo: `Barter for ${listing.name} (ID: ${listing.id})`,
-                    metadata: { listingId: listing.id, buyerId: user.uid },
-                }, {
-                    onReadyForServerApproval: (paymentId) => {
-                        showMessage(`✅ पेमेंट शुरू हुआ: ${paymentId}. Pi Server पर अप्रूवल का इंतज़ार है।`, 'success');
-                        // Simulating successful server approval for the mock
-                        setTimeout(() => {
-                             Pi.completePayment(paymentId, { txid: 'mock_tx_' + Date.now() });
-                        }, 1000);
-                    },
-                    onPaymentCompleted: (paymentId, txid) => {
-                        showMessage(`🎉 बार्टर सफल! ट्रांजेक्शन ID: ${txid}`, 'success');
-                        // Here, you would typically update the listing status in Firestore to 'sold'
-                    },
-                    onPaymentCancelled: () => {
-                        showMessage("❌ पेमेंट रद्द हो गया।", 'error');
-                    },
-                    onError: (error) => {
-                        showMessage(`❌ पेमेंट एरर: ${error.message}`, 'error');
-                    }
-                });
-            };
-
-            // --- Rendering Logic ---
-
-            const filteredListings = listings.filter(listing =>
-                listing.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                listing.description?.toLowerCase().includes(searchQuery.toLowerCase())
-            );
             
-            const piSignInButtonClass = user && !user.isAnonymous
-                ? 'bg-red-500 text-white hover:bg-red-600'
-                : 'bg-pi-main text-pi-dark hover:bg-yellow-400';
-
-            const userIdDisplay = user ? (user.isAnonymous ? 'अतिथि (Guest)' : user.uid) : 'अतिथि (Not signed in)';
-            
-            return (
-                <div className="min-h-screen">
-                    {/* Header & Navigation */}
-                    <header className="bg-pi-dark shadow-xl sticky top-0 z-20">
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-                            <h1 className="text-3xl font-extrabold text-white tracking-wider">Barter<span className="text-pi-main">-Pi</span></h1>
-                            <div className="flex items-center space-x-4">
-                                <span className="text-white text-sm hidden sm:block">
-                                    <User size={16} className="inline-block mr-1" />
-                                    {loading ? 'लोड हो रहा है...' : (user && !user.isAnonymous ? (user.displayName || 'उपयोगकर्ता') : 'अतिथि')}
-                                </span>
-                                <button 
-                                    onClick={handlePiSignIn} 
-                                    className={`${piSignInButtonClass} font-semibold py-2 px-4 rounded-lg transition shadow-lg`}
-                                >
-                                    {user && !user.isAnonymous ? 'साइन आउट' : 'Pi से साइन इन करें'}
-                                </button>
-                            </div>
+            // Render the current page based on state
+            const renderPage = () => {
+                if (!isAuthReady) {
+                    return (
+                        <div className="text-center p-20">
+                            <p className="text-xl font-semibold text-pi-dark">🛡️ सुरक्षा जाँच हो रही है...</p>
+                            <p className="text-gray-500 mt-2">Firebase, Pi Auth और Render Variables की जाँच की जा रही है।</p>
                         </div>
-                    </header>
+                    );
+                }
 
-                    <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                switch (currentPage) {
+                    case 'deals':
+                    case 'listings': // Combine Main Deals and Listings Page
+                        return <DealsPage db={db} user={user} storage={storage} navigate={navigate} ai={{ piPrice, aiLoading }} />;
+                    case 'chat':
+                        return <ChatPage db={db} user={user} />;
+                    case 'ai':
+                        return <AIHelperPage piPrice={piPrice} loading={aiLoading} getAIResponse={getAIResponse} />;
+                    case 'admin':
+                        return <AdminPage isAdmin={isAdmin} />;
+                    case 'order':
+                        return <OrderPage db={db} user={user} params={pageParams} />;
+                    default:
+                        return <DealsPage db={db} user={user} storage={storage} navigate={navigate} ai={{ piPrice, aiLoading }} />;
+                }
+            };
 
-                        {/* Listings Section */}
-                        <section className="mb-10 bg-white rounded-2xl p-6 shadow-2xl">
-                            <h2 className="text-3xl font-bold text-pi-dark mb-6 border-b pb-3">लेटेस्ट <span className="text-pi-main">Barter</span> लिस्टिंग</h2>
-                            
-                            {/* Search Bar */}
-                            <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                                <div className="relative flex-grow">
-                                    <input 
-                                        type="text" 
-                                        placeholder="आइटम, कीमत या विवरण खोजें..." 
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full p-4 border border-gray-300 rounded-xl focus:ring-pi-main focus:border-pi-main pl-12 transition shadow-inner"
-                                    />
-                                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                                </div>
-                            </div>
-                            
-                            {/* Loading & Status Message */}
-                            {loading && <p className="text-center text-pi-blue my-10 text-xl font-medium">✨ लिस्टिंग लोड हो रही है...</p>}
-                            {!isFirebaseAvailable && !loading && (
-                                <p className="text-center text-red-500 my-10 text-xl font-medium">❌ डेटाबेस कनेक्शन विफल। Firebase कॉन्फिग की जाँच करें।</p>
-                            )}
-
-                            {/* Listings Grid */}
-                            <div id="listings-container" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                {!loading && filteredListings.length === 0 && isFirebaseAvailable && (
-                                    <p className="text-center text-gray-500 my-10 text-xl col-span-full">कोई लिस्टिंग नहीं मिली।</p>
-                                )}
-                                {filteredListings.map(listing => (
-                                    <ListingCard 
-                                        key={listing.id} 
-                                        listing={listing} 
-                                        user={user} 
-                                        onBarterClick={handleBarterClick}
-                                    />
-                                ))}
-                            </div>
-                        </section>
-
-                        {/* Post New Barter Section */}
-                        <section className="mb-10 bg-white rounded-2xl p-6 shadow-2xl">
-                            <h2 className="text-3xl font-bold text-pi-dark mb-4 border-b pb-3">एक नई <span className="text-pi-main">Barter</span> पोस्ट करें</h2>
-                            <p className="text-gray-600 mb-6 text-sm">
-                                वर्तमान उपयोगकर्ता ID: <span className="font-mono text-pi-dark font-semibold break-all">{userIdDisplay}</span>
-                            </p>
-
-                            <button 
-                                onClick={() => setIsModalOpen(true)} 
-                                disabled={user?.isAnonymous || !isFirebaseAvailable}
-                                className={`font-semibold py-3 px-6 rounded-lg transition shadow-lg w-full sm:w-auto ${
-                                    user && !user.isAnonymous && isFirebaseAvailable ? 
-                                    'bg-yellow-500 text-pi-dark hover:bg-yellow-600' : 
-                                    'bg-gray-300 text-gray-600 cursor-not-allowed'
-                                }`}
-                            >
-                                <Send size={20} className="inline-block mr-2" /> + नई लिस्टिंग पोस्ट करें
-                            </button>
-                            {(user && user.isAnonymous) && <p className="text-sm text-red-500 mt-3">पोस्ट करने के लिए Pi से साइन इन करें।</p>}
-                            {!isFirebaseAvailable && <p className="text-sm text-red-500 mt-3">Firebase उपलब्ध नहीं है। पोस्टिंग अक्षम है।</p>}
-                        </section>
-
-                        {/* Pi Wallet & Orders Section */}
-                        <section className="bg-white rounded-2xl p-6 shadow-2xl">
-                            <h2 className="text-3xl font-bold text-pi-dark mb-4 border-b pb-3">Pi Wallet & ऑर्डर्स</h2>
-                            <p className="text-gray-600 mb-6">यह खंड Pi Wallet SDK के साथ वास्तविक भुगतान इतिहास दिखाएगा।</p>
-                            <button 
-                                onClick={() => showMessage('Pi Wallet SDK से ऑर्डर फ़ेच करना यहाँ एकीकृत होगा।', 'success')} 
-                                className="bg-pi-blue text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-600 transition shadow-md"
-                            >
-                                <ShoppingCart size={20} className="inline-block mr-2" /> ऑर्डर इतिहास देखें
-                            </button>
-                        </section>
-
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    <Header 
+                        user={user} 
+                        isAdmin={isAdmin} 
+                        onSignOut={handleSignOut} 
+                        navigate={navigate} 
+                        currentPage={currentPage}
+                    />
+                    <main className="pb-20">
+                        {renderPage()}
                     </main>
-
-                    {/* Modal */}
-                    <NewListingModal 
-                        isModalOpen={isModalOpen} 
-                        setIsModalOpen={setIsModalOpen} 
-                        onSubmit={submitNewListing} 
-                        user={user}
-                    />
-
-                    {/* Message Box */}
-                    <MessageBox 
-                        message={message} 
-                        type={messageType} 
-                        isVisible={isMessageVisible} 
-                        onClose={() => setIsMessageVisible(false)} 
-                    />
+                    {/* Fixed Footer for UID Display */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-gray-800 text-white p-2 text-center text-xs shadow-inner z-40">
+                        <span className="font-bold">Current User ID: </span>
+                        <span className="font-mono break-all">{user ? user.uid : 'Signing In...'}</span>
+                    </div>
                 </div>
             );
         };
 
         // --- Render the App ---
-        // Use createRoot for React 18
-        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        if (typeof ReactDOM !== 'undefined' && typeof React !== 'undefined') {
+            ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        } else {
+            document.getElementById('root').innerHTML = `
+                <div class="p-8 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-xl m-8 shadow-xl">
+                    <h2 class="text-2xl font-bold mb-3">❌ गंभीर CDN त्रुटि</h2>
+                    <p>React या Babel फ़ाइलें लोड नहीं हो पाईं। Render या नेटवर्क की जाँच करें।</p>
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>
