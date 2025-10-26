@@ -155,7 +155,7 @@
                     </div>
                     <div class="flex flex-col w-full md:w-2/3 md:pl-3">
                         <h2 class="text-base font-bold text-gray-800 mb-3 border-b pb-1">iPhone 14 Pro (Chat)</h2>
-                         <div class="flex-grow bg-gray-50 p-3 rounded-lg overflow-y-scroll space-y-3 text-sm" id="ai-messages">
+                         <div class="flex-grow bg-gray-50 p-3 rounded-lg overflow-y-scroll space-y-3 text-sm">
                             <div class="flex justify-start"><div class="bg-white p-2 rounded-xl rounded-tl-none max-w-xs shadow-md">नमस्ते, 400 Pi ठीक रहेगा?</div></div>
                             <div class="flex justify-end"><div class="text-right"><div class="bg-indigo-100 p-2 rounded-xl rounded-tr-none max-w-xs shadow-md">450 Pi अंतिम मूल्य है।</div></div></div>
                         </div>
@@ -260,7 +260,7 @@
             var script = document.createElement('script');
             script.src = "https://sdk.minepi.com/sdk.js"; 
             document.head.appendChild(script);
-            script.onload = checkPiReady;
+            script.onload = checkPiReady; 
         }
 
         function checkPiReady() {
@@ -326,7 +326,6 @@
             
             return false;
         }
-
 
         // --- AI CHAT LOGIC (Active) ---
         function addMessage(sender, text) {
@@ -507,7 +506,7 @@
         window.onload = function() {
             setupNavigation();
             
-            // फ़िल्टर इवेंट को सक्रिय करें (Activate Filter Event)
+            // फ़िल्टर इवेंट को यहाँ जोड़ें (Correct Activation for Filter)
             var categoryFilter = document.getElementById('category-filter');
             if (categoryFilter) {
                 categoryFilter.addEventListener('change', renderListings);
