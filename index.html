@@ -259,10 +259,20 @@
         function checkPiReady() {
             var piButton = document.getElementById('test-pi-button');
             if (typeof Pi !== 'undefined') {
-                // SDK is found, enable the button
-                piButton.removeAttribute('disabled');
-                piButton.innerText = '💲 टेस्ट Pi ट्रांजेक्शन'; 
-                piButton.className = piButton.className.replace('opacity-50', '');
+                // Now check if it's initialized correctly
+                try {
+                    Pi.init({
+                        onReady: function () {
+                            // Successfully initialized, enable button
+                            piButton.removeAttribute('disabled');
+                            piButton.innerText = '💲 टेस्ट Pi ट्रांजेक्शन'; 
+                            piButton.className = piButton.className.replace('opacity-50', '');
+                        }
+                    });
+                } catch (e) {
+                    // SDK found but initialization failed (rare)
+                    piButton.innerText = '⚠️ INIT ERROR'; 
+                }
             } else {
                 // Not ready yet, retry after 500ms
                 setTimeout(checkPiReady, 500); 
@@ -291,6 +301,7 @@
                     // Callback when transaction is approved by the user
                     onReadyForServerApproval: function(paymentId) {
                         alert("SUCCESS: Transaction Ready for Server Approval! CHECKLIST CLEARED.");
+                        // The Pi Network developer portal will detect this state.
                     },
                     // Callback if the transaction is cancelled by the user
                     onCancel: function(paymentId) {
@@ -458,7 +469,7 @@
         window.onload = function() {
             setupNavigation();
             renderListings(); // Load listings on Home page
-            checkPiReady(); // START THE PI CHECK
+            checkPiReady(); // START THE PI CHECK and INITIALIZE SDK
         };
     </script>
 
