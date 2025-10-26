@@ -276,7 +276,36 @@
                 var button = document.createElement('button');
                 button.innerHTML = pages[pageId];
                 button.setAttribute('data-page', pageId);
-                button.className = 'nav-button px-3 py-2 rounded-lg text-sm font-medium transition duration-200 text-gray-600 hover:bg-gray-100 whitespace-nowrap';
+                // --- NAVIGATION LOGIC ---
+function setupNavigation() {
+    var pages = {
+        'Home': 'होम', 'Profile': 'प्रोफ़ाइल', 'Orders': 'ऑर्डर्स', 
+        'Chat': 'चैट', 'AIHelper': 'AI हेल्पर', 'Admin': 'एडमिन'
+    };
+    var navContainer = document.getElementById('nav-buttons');
+    var DUMMY_USER_ID = "ADM_PRO_USER_007";
+    var ADMIN_ID = DUMMY_USER_ID; 
+
+    // पुरानी सामग्री को खाली करें
+    navContainer.innerHTML = ''; 
+
+    for (var pageId in pages) {
+        // Admin button check
+        if (pageId === 'Admin' && DUMMY_USER_ID !== ADMIN_ID) continue;
+        
+        var button = document.createElement('button');
+        button.innerHTML = pages[pageId];
+        button.setAttribute('data-page', pageId);
+        
+        // **यहां है वह महत्वपूर्ण अपडेटेड कोड लाइन:**
+        button.className = 'nav-button px-2 py-1 rounded-lg text-xs font-medium m-0.5 transition duration-200 text-gray-600 hover:bg-gray-100 whitespace-nowrap';
+        
+        button.onclick = function() { switchPage(this.getAttribute('data-page')); };
+        navContainer.appendChild(button);
+    }
+
+    switchPage('Home');
+}
                 button.onclick = function() { switchPage(this.getAttribute('data-page')); };
                 navContainer.appendChild(button);
             }
