@@ -1,537 +1,479 @@
+<!-- Barter-Pi Web Application - Local Storage / MongoDB Fallback -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Barter-Pi Testnet</title>
-    <!-- Pi SDK Integration -->
-    <script src="https://sdk.mine.pi/pi-platform-library.js"></script>
-    <!-- Tailwind CSS for modern, responsive design -->
+    <title>Barter-Pi</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        // Tailwind CSS Configuration
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'pi-dark': '#2c2c2c',
+                        'pi-main': '#ffb33f', // Yellowish Gold from the Pi logo
+                        'pi-light': '#fef3e4',
+                        'pi-blue': '#1e75ff', // For wallet
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        /* Custom Styles for Pi Branding */
-        body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; }
-        .pi-brand { color: #fcc303; }
-        .pi-button { background-color: #fcc303; color: #1c2e4a; font-weight: 700; transition: background-color 0.2s; }
-        .pi-button:hover { background-color: #e0ac00; }
-        /* Modal Visibility */
-        .modal-overlay { background-color: rgba(0, 0, 0, 0.6); display: none; }
-        .modal-overlay.active { display: flex; }
+        body { font-family: 'Inter', sans-serif; background-color: #f7f7f7; }
+        .card { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
     </style>
 </head>
-<body>
+<body class="bg-gray-100 min-h-screen">
 
-    <!-- Main Application Container -->
-    <div id="app" class="min-h-screen">
-        <!-- Error Display Box ADDED HERE -->
-        <div id="errorDisplayBox" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative hidden" role="alert">
-            <strong class="font-bold">FATAL ERROR:</strong>
-            <span class="block sm:inline" id="errorMessageContent">Initialization failed.</span>
-        </div>
-        <!-- Header -->
-        <header class="bg-[#1c2e4a] p-4 shadow-lg sticky top-0 z-10">
-            <div class="max-w-6xl mx-auto flex justify-between items-center">
-                <h1 class="text-3xl font-bold text-white tracking-wider">
-                    Barter-<span class="pi-brand">Pi</span>
-                </h1>
-                <div class="flex items-center space-x-4">
-                    <span id="authStatus" class="text-sm text-gray-400">Loading...</span>
-                    <button id="authButton" class="bg-gray-700 text-white px-3 py-1 rounded-full text-sm hover:bg-gray-600 transition duration-200">
-                        Sign In
-                    </button>
-                </div>
+    <!-- Header & Navigation -->
+    <header class="bg-pi-dark shadow-md sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-white">Barter-Pi</h1>
+            <div class="flex items-center space-x-4">
+                <span id="loading-indicator" class="text-white text-sm">लोड हो रहा है...</span>
+                <button onclick="handleSignIn()" id="sign-in-btn" class="bg-pi-main text-pi-dark font-semibold py-2 px-4 rounded-lg hover:bg-yellow-400 transition shadow-md">
+                    साइन इन करें
+                </button>
             </div>
-        </header>
+        </div>
+    </header>
 
-        <!-- Main Content Layout (Responsive Grid) -->
-        <main class="max-w-6xl mx-auto p-4 grid lg:grid-cols-[1fr_360px] gap-6 mt-6">
+    <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
 
-            <!-- Left Column: Listings -->
-            <section class="bg-white p-6 rounded-xl shadow-2xl">
-                <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">
-                    Latest <span class="pi-brand">Barter</span> Listings (पंजीकृत वस्तुएं)
-                </h2>
-                <!-- Search and Filters (Placeholder) -->
-                <div class="mb-6 flex space-x-3">
-                    <input type="text" id="searchInput" placeholder="Search items or keywords..."
-                           class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-pi-brand focus:border-pi-brand transition duration-150">
-                    <button id="searchButton" class="pi-button px-4 py-2 rounded-lg shadow-md">Search</button>
-                </div>
+        <!-- Listings Section -->
+        <section class="mb-10 card bg-white rounded-xl p-6">
+            <h2 class="text-2xl font-bold text-pi-dark mb-4">लेटेस्ट <span class="text-pi-main">Barter</span> लिस्टिंग (पंजीकृत वस्तुएं)</h2>
+            <div class="flex flex-col sm:flex-row gap-4 mb-6">
+                <input type="text" id="search-input" placeholder="आइटम या कीवर्ड्स खोजें..." class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main">
+                <button onclick="searchListings()" class="bg-pi-main text-pi-dark font-semibold py-3 px-6 rounded-lg hover:bg-yellow-400 transition shadow-md">
+                    खोजें
+                </button>
+            </div>
+            
+            <p id="loading-status" class="text-center text-gray-500 my-6 text-lg">Firestore से लिस्टिंग लोड हो रही है...</p>
 
-                <!-- Listings Grid -->
-                <div id="listingsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <p id="loadingMessage" class="col-span-full text-center text-gray-500 py-8">
-                        Firestore से लिस्टिंग लोड हो रही है...
-                    </p>
-                </div>
-            </section>
+            <div id="listings-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                <!-- Listings will be injected here -->
+            </div>
+            <p id="no-listings-message" class="hidden text-center text-gray-500 my-6 text-lg">कोई लिस्टिंग नहीं मिली।</p>
+        </section>
 
-            <!-- Right Column: Sidebar (Create Listing/Wallet) -->
-            <aside class="space-y-6">
-                <!-- Create New Listing Card -->
-                <div class="bg-white p-6 rounded-xl shadow-2xl border-t-4 border-pi-brand">
-                    <h3 class="text-xl font-semibold mb-4 text-gray-800">
-                        Post a New <span class="pi-brand">Barter</span> (नई वस्तु)
-                    </h3>
-                    <p class="text-sm text-gray-500 mb-4">
-                        पोस्ट करने के लिए लॉग इन होना सुनिश्चित करें। आपका ID: <span id="currentUserId" class="font-mono text-xs text-blue-600">...</span>
-                    </p>
-                    <button id="openCreateModalButton" class="w-full pi-button py-3 rounded-xl text-lg shadow-xl hover:shadow-2xl">
-                        + नई लिस्टिंग
-                    </button>
-                </div>
+        <!-- Post New Barter Section -->
+        <section class="mb-10 card bg-white rounded-xl p-6">
+            <h2 class="text-2xl font-bold text-pi-dark mb-4">एक नई <span class="text-pi-main">Barter</span> पोस्ट करें (नई वस्तु)</h2>
+            <p id="post-status" class="text-gray-600 mb-4">पोस्ट करने के लिए लॉग इन होना सुनिश्चित करें। आपका ID: <span id="user-id-display">...</span></p>
 
-                <!-- Order History / Wallet Status Card -->
-                <div class="bg-white p-6 rounded-xl shadow-2xl">
-                    <h3 class="text-xl font-semibold mb-4 text-gray-800">
-                        Pi Wallet & Orders (ऑर्डर इतिहास)
-                    </h3>
-                    <p class="text-gray-600 text-sm mb-4">
-                        यह खंड Pi Wallet SDK से जुड़ेगा।
-                    </p>
-                    <button id="openOrdersModalButton" class="w-full bg-gray-200 text-gray-700 py-2 rounded-xl hover:bg-gray-300 transition duration-200">
-                        ऑर्डर देखें (भुगतान)
-                    </button>
-                </div>
-            </aside>
+            <button onclick="openPostModal()" id="new-listing-btn" class="bg-yellow-500 text-pi-dark font-semibold py-3 px-6 rounded-lg hover:bg-yellow-600 transition shadow-lg w-full sm:w-auto">
+                + नई लिस्टिंग
+            </button>
+        </section>
 
-        </main>
-    </div>
+        <!-- Pi Wallet & Orders Section -->
+        <section class="card bg-white rounded-xl p-6">
+            <h2 class="text-2xl font-bold text-pi-dark mb-4">Pi Wallet & Orders (ऑर्डर इतिहास)</h2>
+            <p class="text-gray-600 mb-4">यह खंड Pi Wallet SDK से जुड़ेगा।</p>
+            <button onclick="handlePayment()" class="bg-pi-blue text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-600 transition shadow-md">
+                ऑर्डर देखें (भुगतान)
+            </button>
+        </section>
 
-    <!-- 1. Create Listing Modal -->
-    <div id="createListingModal" class="modal-overlay fixed inset-0 z-50 justify-center items-center p-4">
-        <div class="bg-white w-full max-w-lg p-6 rounded-xl shadow-3xl transform transition-all duration-300">
-            <h2 class="text-2xl font-bold mb-4 border-b pb-2">Create New Listing (नई वस्तु पोस्ट करें)</h2>
-            <form id="listingForm" class="space-y-4">
-                <div>
-                    <label for="listingTitle" class="block text-sm font-medium text-gray-700">Title (शीर्षक)</label>
-                    <input type="text" id="listingTitle" required
-                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-pi-brand focus:border-pi-brand">
+    </main>
+
+    <!-- Modal for New Listing -->
+    <div id="post-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl">
+            <h3 class="text-xl font-bold text-pi-dark mb-4">नई वस्तु पोस्ट करें</h3>
+            <form id="new-listing-form" onsubmit="event.preventDefault(); submitNewListing()">
+                <div class="mb-4">
+                    <label for="item-name" class="block text-sm font-medium text-gray-700">वस्तु का नाम</label>
+                    <input type="text" id="item-name" required class="mt-1 p-2 w-full border border-gray-300 rounded-lg">
                 </div>
-                <div>
-                    <label for="listingPrice" class="block text-sm font-medium text-gray-700">Price in Pi (π में कीमत)</label>
-                    <input type="number" id="listingPrice" required min="0.01" step="0.01" value="1.00"
-                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-pi-brand focus:border-pi-brand">
+                <div class="mb-4">
+                    <label for="item-description" class="block text-sm font-medium text-gray-700">विवरण</label>
+                    <textarea id="item-description" required class="mt-1 p-2 w-full border border-gray-300 rounded-lg h-24"></textarea>
                 </div>
-                <div>
-                    <label for="listingDescription" class="block text-sm font-medium text-gray-700">Description (विवरण)</label>
-                    <textarea id="listingDescription" rows="3"
-                              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-pi-brand focus:border-pi-brand"></textarea>
+                <div class="mb-4">
+                    <label for="item-price" class="block text-sm font-medium text-gray-700">Pi में कीमत</label>
+                    <input type="number" id="item-price" step="0.0001" required class="mt-1 p-2 w-full border border-gray-300 rounded-lg">
                 </div>
-                <div class="flex justify-end space-x-3 pt-2">
-                    <button type="button" id="closeCreateModal" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel (रद्द करें)</button>
-                    <button type="submit" class="pi-button px-4 py-2 rounded-lg shadow-md">Post Listing (पोस्ट करें)</button>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" onclick="closePostModal()" class="bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-400 transition">रद्द करें</button>
+                    <button type="submit" class="bg-pi-main text-pi-dark font-semibold py-2 px-4 rounded-lg hover:bg-yellow-400 transition">पोस्ट करें</button>
                 </div>
             </form>
-            <p id="listingMessage" class="mt-4 text-sm text-green-600 hidden"></p>
         </div>
     </div>
 
-    <!-- 2. Orders/Payments Modal (Placeholder for Pi Payment Flow) -->
-    <div id="ordersModal" class="modal-overlay fixed inset-0 z-50 justify-center items-center p-4">
-        <div class="bg-white w-full max-w-3xl p-6 rounded-xl shadow-3xl transform transition-all duration-300">
-            <h2 class="text-2xl font-bold mb-4 border-b pb-2">Your Transaction History (आपके लेन-देन)</h2>
-
-            <div id="paymentsContainer" class="max-h-96 overflow-y-auto space-y-3">
-                <p class="text-center text-gray-500 py-4" id="noPaymentsMessage">
-                    कोई लेन-देन नहीं मिला।
-                </p>
-            </div>
-
-            <div class="flex justify-end pt-4">
-                <button type="button" id="closeOrdersModal" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Close (बंद करें)</button>
-            </div>
-        </div>
+    <!-- Message Box (Instead of alert()) -->
+    <div id="message-box" class="fixed top-4 right-4 z-50 p-4 bg-green-500 text-white rounded-lg shadow-xl transition-opacity duration-300 hidden opacity-0" role="alert">
+        <p id="message-text">यह एक संदेश है।</p>
     </div>
-
-    <!-- Firebase Initialization and Script -->
+    
+    <!-- Pi SDK Mock and Firestore/Local Storage Handling -->
     <script type="module">
-        // Canvas environment द्वारा प्रदान किए गए ग्लोबल वैरिएबल
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // Import Pi SDK Mocks
+        import { Pi } from "https://cdn.jsdelivr.net/gh/ph0enix-dev/pi-sdk-mock@main/pi-sdk-mock.js";
+
+        // Global State Variables
+        let userId = 'guest-' + crypto.randomUUID().substring(0, 8);
+        let isAuthenticated = false;
+        let db = null;
+        let auth = null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Mandate
         
-        // स्क्रीन पर त्रुटि दिखाने का फ़ंक्शन
-        function displayFatalError(message) {
-            const errorBox = document.getElementById('errorDisplayBox');
-            const errorMessageContent = document.getElementById('errorMessageContent');
-            if (errorBox && errorMessageContent) {
-                errorMessageContent.textContent = message;
-                errorBox.classList.remove('hidden');
-                console.error("FATAL ERROR DISPLAYED:", message);
-            }
-        }
-
-
-        // 1. Firebase Imports
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, collection, query, onSnapshot, addDoc, updateDoc, getDocs, serverTimestamp, limit, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase Debug Logging चालू करें
-        setLogLevel('debug');
-
-        // 2. Initialize Firebase
-        let app, db, auth;
-        try {
-            if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.projectId) {
-                displayFatalError("Firebase कॉन्फ़िगरेशन खाली या अमान्य है। Firebase को लोड नहीं किया जा सकता।");
-                return; // Initialization रोकें
-            }
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-        } catch (e) {
-             displayFatalError(`Firebase Initialization failed: ${e.message}`);
-             console.error("Firebase Initialization failed:", e);
-             return; // Initialization रोकें
-        }
+        // Use a flag to bypass Firebase/Firestore if config is missing (for local/testing mode)
+        const IS_FIREBASE_ENABLED = typeof __firebase_config !== 'undefined' && __firebase_config.length > 10;
         
-        // Pi SDK Initialization (Pi.js)
-        if (typeof Pi !== 'undefined') {
-            Pi.init({ version: "2.0", sandbox: true }); // Sandbox mode for Testnet
-        } else {
-            console.error("Pi SDK could not be initialized. Is Pi Platform Library included?");
+        // --- Utility Functions ---
+
+        function showMessage(text, type = 'success') {
+            const messageBox = document.getElementById('message-box');
+            const messageText = document.getElementById('message-text');
+            messageText.textContent = text;
+            
+            messageBox.className = `fixed top-4 right-4 z-50 p-4 text-white rounded-lg shadow-xl transition-opacity duration-300 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} opacity-0`;
+            messageBox.classList.remove('hidden');
+
+            setTimeout(() => {
+                messageBox.classList.add('opacity-100');
+            }, 10);
+
+            setTimeout(() => {
+                messageBox.classList.remove('opacity-100');
+                setTimeout(() => {
+                    messageBox.classList.add('hidden');
+                }, 300);
+            }, 3000);
         }
 
-
-        let currentUser = null; 
-
-        // सुरक्षा नियमों (security rules) के आधार पर Firestore पथ (paths) बनाने के लिए उपयोगिता
-        const PUBLIC_COLLECTION_PATH = (collectionName) => `/artifacts/${appId}/public/data/${collectionName}`;
-        const PRIVATE_COLLECTION_PATH = (collectionName) => `/artifacts/${appId}/users/${currentUser?.uid || 'guest'}/${collectionName}`;
-
-        // 3. Authentication Setup (सुरक्षित Pi Auth Token का उपयोग करता है)
-        onAuthStateChanged(auth, async (user) => {
-            const authStatusEl = document.getElementById('authStatus');
-            const authButtonEl = document.getElementById('authButton');
-            const currentUserIdEl = document.getElementById('currentUserId');
-
-            if (user) {
-                currentUser = user;
-                authStatusEl.textContent = `लॉग इन: ${user.uid.substring(0, 8)}...`;
-                currentUserIdEl.textContent = user.uid;
-                authButtonEl.textContent = 'Signed In (Pi User)';
-                authButtonEl.disabled = true;
-
-                setupRealtimeListeners();
-            } else {
-                // प्रारंभिक साइन-इन प्रयास
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(auth, initialAuthToken);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                } catch (error) {
-                    console.error("Firebase साइन-इन विफल (Sign-in Failed):", error);
-                    authStatusEl.textContent = 'Auth Error';
-                    authButtonEl.textContent = 'Login Failed';
-                }
-            }
-        });
-
-
-        // --- REALTIME DATA LISTENERS (Firestore) ---
-
-        function setupRealtimeListeners() {
-            // A. Listings Listener (लिस्टिंग श्रोता) - सार्वजनिक (Public)
-            const listingsRef = collection(db, PUBLIC_COLLECTION_PATH('listings'));
-            const qListings = query(listingsRef, limit(200));
-
-            onSnapshot(qListings, (snapshot) => {
-                const listings = [];
-                snapshot.forEach(doc => {
-                    listings.push({ id: doc.id, ...doc.data() });
-                });
-
-                listings.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                renderListings(listings);
-            }, (error) => {
-                console.error("लिस्टिंग प्राप्त करने में त्रुटि (Error fetching listings):", error);
-                document.getElementById('loadingMessage').textContent = 'लिस्टिंग लोड करने में त्रुटि। विवरण के लिए कंसोल देखें।';
-            });
-
-            // B. Payments Listener (भुगतान श्रोता) - निजी (Private)
-            const paymentsRef = collection(db, PRIVATE_COLLECTION_PATH('payments'));
-            const qPayments = query(paymentsRef, limit(100));
-
-            onSnapshot(qPayments, (snapshot) => {
-                const payments = [];
-                snapshot.forEach(doc => {
-                    payments.push({ id: doc.id, ...doc.data() });
-                });
-                payments.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-
-                renderPayments(payments);
-            }, (error) => {
-                console.error("भुगतान प्राप्त करने में त्रुटि (Error fetching payments):", error);
-            });
+        function updateAuthState(user) {
+            isAuthenticated = !!user;
+            userId = user ? user.uid : 'guest-' + crypto.randomUUID().substring(0, 8);
+            document.getElementById('user-id-display').textContent = userId;
+            const signInBtn = document.getElementById('sign-in-btn');
+            signInBtn.textContent = isAuthenticated ? 'साइन आउट' : 'साइन इन करें';
+            loadListings(); // Reload listings based on auth state
         }
 
-
-        // --- UI Rendering Functions ---
+        // --- Core App Logic ---
 
         function renderListings(listings) {
-            const container = document.getElementById('listingsContainer');
+            const container = document.getElementById('listings-container');
+            const status = document.getElementById('loading-status');
+            const noListings = document.getElementById('no-listings-message');
+            
+            status.classList.add('hidden');
             container.innerHTML = '';
+
             if (listings.length === 0) {
-                container.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">कोई सक्रिय लिस्टिंग नहीं मिली।</p>';
+                noListings.classList.remove('hidden');
                 return;
             }
+            noListings.classList.add('hidden');
 
-            listings.forEach(item => {
-                const isSold = item.status === 'sold';
-                const card = document.createElement('div');
-                card.className = `bg-gray-50 p-4 rounded-xl shadow-lg border-l-4 ${isSold ? 'border-red-500' : 'border-blue-500'} transition hover:shadow-xl`;
-                card.innerHTML = `
-                    <div class="flex items-center space-x-3 mb-2">
-                        <span class="text-xl font-semibold text-gray-800 truncate">${item.title}</span>
-                        <span class="ml-auto text-sm font-medium px-2 py-1 rounded-full ${isSold ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">
-                            ${isSold ? 'बिक गया (SOLD)' : item.status.toUpperCase()}
-                        </span>
+            listings.forEach(listing => {
+                const listingElement = document.createElement('div');
+                listingElement.className = 'bg-white p-4 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition transform hover:scale-[1.01]';
+                listingElement.innerHTML = `
+                    <h3 class="text-xl font-semibold text-pi-dark">${listing.name}</h3>
+                    <p class="text-sm text-gray-500 mt-1 mb-3">ID: ${listing.id.substring(0, 8)} | ${new Date(listing.date).toLocaleDateString()}</p>
+                    <p class="text-gray-700">${listing.description}</p>
+                    <div class="mt-4 flex justify-between items-center">
+                        <span class="text-2xl font-bold text-pi-main">${listing.price} <span class="text-base font-normal text-gray-600">π</span></span>
+                        <button onclick="barterItem('${listing.id}')" class="bg-pi-blue text-white text-sm font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition">बार्टर करें</button>
                     </div>
-                    <p class="text-2xl font-bold pi-brand mb-2">
-                        ${(item.pricePi || 0).toFixed(2)} π
-                    </p>
-                    <p class="text-sm text-gray-600 mb-3 line-clamp-2">${item.description || 'कोई विवरण नहीं दिया गया है।'}</p>
-                    <div class="text-xs text-gray-400 mb-3">
-                        मालिक (Owner): ${item.ownerId?.substring(0, 8) || 'Unknown'} | पोस्ट किया गया: ${new Date(item.createdAt?.seconds * 1000).toLocaleDateString()}
-                    </div>
-                    <button data-listing-id="${item.id}" data-price="${item.pricePi}" data-title="${item.title}"
-                            class="buy-button w-full pi-button py-2 rounded-lg text-sm ${isSold ? 'opacity-50 cursor-not-allowed' : ''}"
-                            ${isSold ? 'disabled' : ''}>
-                        ${isSold ? 'बिक गया' : 'Pi भुगतान शुरू करें'}
-                    </button>
                 `;
-                container.appendChild(card);
+                container.appendChild(listingElement);
             });
+        }
 
-            document.querySelectorAll('.buy-button').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const listingId = e.target.getAttribute('data-listing-id');
-                    const amount = parseFloat(e.target.getAttribute('data-price'));
-                    const title = e.target.getAttribute('data-title');
+        async function loadListings() {
+            const status = document.getElementById('loading-status');
+            status.classList.remove('hidden');
+            status.textContent = "लिस्टिंग लोड हो रही है...";
+
+            let listings = [];
+            
+            if (IS_FIREBASE_ENABLED && db) {
+                // If Firebase is enabled and initialized, try to load from Firestore
+                try {
+                    console.log("Attempting to load listings from Firestore...");
+                    // Fallback to simpler query just in case the app ID path fails
+                    const listingsCol = await getDocs(query(collection(db, 'listings')));
+                    listings = listingsCol.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     
-                    if (currentUser) {
-                        initiatePiPayment(listingId, amount, title);
-                    } else {
-                        showMessage('कृपया भुगतान शुरू करने के लिए साइन इन करें।', 'red');
-                    }
-                });
-            });
-        }
+                    // Sorting is done client-side to avoid Firestore index issues
+                    listings.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    status.textContent = "Firestore से लिस्टिंग लोड हुई।";
 
-        function renderPayments(payments) {
-            const container = document.getElementById('paymentsContainer');
-            const noPaymentsMessage = document.getElementById('noPaymentsMessage');
-            container.innerHTML = '';
-            
-            if (payments.length === 0) {
-                noPaymentsMessage.style.display = 'block';
-                return;
-            }
-            noPaymentsMessage.style.display = 'none';
-
-            payments.forEach(p => {
-                const isPaid = p.status === 'paid';
-                const item = document.createElement('div');
-                item.className = `p-3 rounded-lg flex justify-between items-center ${isPaid ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'} border`;
-                item.innerHTML = `
-                    <div>
-                        <p class="font-semibold text-gray-800">ऑर्डर (Order): ${p.listingTitle || 'N/A'}</p>
-                        <p class="text-xs text-gray-600">ID: ${p.id.substring(0, 10)}... | लिस्टिंग: ${p.listingId?.substring(0, 10) || 'N/A'}</p>
-                        <p class="text-xs text-gray-400">दिनांक (Date): ${new Date(p.createdAt?.seconds * 1000).toLocaleString()}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-lg font-bold pi-brand">${(p.amount || 0).toFixed(2)} π</p>
-                        <span class="text-xs font-medium px-2 py-0.5 rounded-full ${isPaid ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white'}">
-                            ${p.status.toUpperCase()}
-                        </span>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-
-        // --- MODAL AND FORM HANDLING ---
-
-        const createModal = document.getElementById('createListingModal');
-        const ordersModal = document.getElementById('ordersModal');
-        const listingForm = document.getElementById('listingForm');
-
-        document.getElementById('openCreateModalButton').addEventListener('click', () => {
-            if (currentUser) {
-                 createModal.classList.add('active');
-            } else {
-                showMessage('लिस्टिंग पोस्ट करने के लिए कृपया साइन इन करें।', 'red');
-            }
-        });
-        document.getElementById('closeCreateModal').addEventListener('click', () => createModal.classList.remove('active'));
-        document.getElementById('openOrdersModalButton').addEventListener('click', () => ordersModal.classList.add('active'));
-        document.getElementById('closeOrdersModal').addEventListener('click', () => ordersModal.classList.remove('active'));
-
-        // नई लिस्टिंग (New Listing) को Firestore में सबमिट करें
-        listingForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const title = document.getElementById('listingTitle').value;
-            const pricePi = parseFloat(document.getElementById('listingPrice').value);
-            const description = document.getElementById('listingDescription').value;
-
-            if (!title || pricePi <= 0) {
-                showMessage('शीर्षक और एक वैध Pi कीमत आवश्यक है।', 'red');
-                return;
-            }
-            
-            const listingMessageEl = document.getElementById('listingMessage');
-            listingMessageEl.textContent = 'लिस्टिंग पोस्ट हो रही है...';
-            listingMessageEl.classList.remove('hidden', 'text-red-600');
-            listingMessageEl.classList.add('text-green-600');
-
-            try {
-                const newListing = {
-                    title: title,
-                    pricePi: pricePi,
-                    description: description,
-                    ownerId: currentUser.uid, 
-                    status: 'open',
-                    createdAt: serverTimestamp(),
-                };
-
-                const listingsRef = collection(db, PUBLIC_COLLECTION_PATH('listings'));
-                await addDoc(listingsRef, newListing);
-
-                listingForm.reset();
-                showMessage('लिस्टिंग सफलतापूर्वक पोस्ट हो गई है! यह जल्द ही दिखाई देगी।', 'green');
-                setTimeout(() => createModal.classList.remove('active'), 1500);
-
-            } catch (error) {
-                console.error("लिस्टिंग बनाने में त्रुटि (Error creating listing):", error);
-                showMessage('लिस्टिंग पोस्ट करने में विफल। विवरण के लिए कंसोल देखें।', 'red');
-            }
-        });
-        
-        // --- CUSTOM MESSAGE BOX (alert() की जगह) ---
-        function showMessage(message, type = 'green') {
-            const el = document.getElementById('listingMessage');
-            el.textContent = message;
-            el.className = `mt-4 text-sm ${type === 'red' ? 'text-red-600' : 'text-green-600'}`;
-            el.classList.remove('hidden');
-        }
-
-        // --- PI PAYMENT LOGIC (THIS IS WHERE WE INTEGRATE PI SDK) ---
-        
-        async function initiatePiPayment(listingId, amount, title) {
-            if (typeof Pi === 'undefined') {
-                showMessage('Pi SDK लोड नहीं हुआ। Pi ब्राउज़र में खोलें।', 'red');
-                return;
-            }
-
-            const newPaymentId = 'pay_' + Math.random().toString(36).slice(2, 10);
-            
-            // 1. Firestore में लंबित (pending) भुगतान रिकॉर्ड बनाएं
-            try {
-                const paymentsRef = collection(db, PRIVATE_COLLECTION_PATH('payments'));
-                await addDoc(paymentsRef, {
-                    id: newPaymentId,
-                    listingId: listingId,
-                    listingTitle: title,
-                    amount: amount,
-                    payerId: currentUser.uid,
-                    status: 'pending',
-                    createdAt: serverTimestamp(),
-                });
-                showMessage(`भुगतान रिकॉर्ड बन गया (ID: ${newPaymentId})। Pi वॉलेट खुल रहा है...`, 'green');
-
-            } catch (error) {
-                console.error("भुगतान रिकॉर्ड बनाने में त्रुटि:", error);
-                showMessage('भुगतान रिकॉर्ड शुरू करने में विफल। कंसोल देखें।', 'red');
-                return;
-            }
-            
-            // 2. Pi.inPayment() को कॉल करें
-            try {
-                Pi.inPayment({
-                    amount: amount,
-                    memo: `Barter-Pi purchase of ${title} (Listing ID: ${listingId})`,
-                    metadata: {
-                        paymentId: newPaymentId,
-                        listingId: listingId
-                    }
-                }, {
-                    onReadyForServerApproval: function(paymentId) {
-                        // NOTE: Testnet में, यह आम तौर पर तुरंत फायर हो जाता है।
-                        console.log(`Payment Ready for Server Approval (Pi ID: ${paymentId})`);
-                        // Production में, आपको इसे अपने सर्वर पर भेजना होगा। Testnet/Sandbox के लिए, हम client-side success पर निर्भर रह सकते हैं।
-                    },
-                    onReadyForServerCompletion: function(paymentId, txid) {
-                        // NOTE: यह callback केवल Testnet में उपयोग किया जाता है जब आप Pi.inPayment.complete() को client-side से कॉल करते हैं।
-                        // Production में, Pi Server यह webhook आपके backend को भेजेगा। 
-                        console.log(`Payment Ready for Server Completion (Pi ID: ${paymentId}, TXID: ${txid})`);
-                        // **यह वह जगह है जहाँ हम भुगतान को पूरा मानते हैं!**
-                        completePiPayment(newPaymentId, listingId);
-                    },
-                    onSuccess: function(payment) {
-                        console.log("Pi Payment Successful:", payment);
-                        showMessage('Pi भुगतान सफल! ऑर्डर अपडेट हो रहा है।', 'green');
-                        // onReadyForServerCompletion के कारण, हम इस पर निर्भर नहीं रहते हैं।
-                    },
-                    onIncomplete: function(payment) {
-                        console.log("Pi Payment Incomplete:", payment);
-                        showMessage('भुगतान अपूर्ण: Pi नेटवर्क से जवाब लंबित है।', 'red');
-                    },
-                    onCancel: function(cancelReason) {
-                        console.log("Pi Payment Cancelled:", cancelReason);
-                        showMessage('भुगतान रद्द कर दिया गया।', 'red');
-                        // यदि रद्द हो जाता है, तो Firestore से 'pending' रिकॉर्ड हटा दें या 'cancelled' में बदल दें।
-                    },
-                    onError: function(error, payment) {
-                        console.error("Pi Payment Error:", error, payment);
-                        showMessage(`भुगतान त्रुटि: ${error.message || 'unknown error'}`, 'red');
-                    }
-                });
-
-            } catch (error) {
-                console.error("Pi.inPayment कॉल करने में त्रुटि:", error);
-                showMessage('भुगतान शुरू करने में असमर्थ। सुनिश्चित करें कि आप Pi ब्राउज़र में हैं।', 'red');
-            }
-        }
-
-        // सफल Pi भुगतान के बाद Firestore को अपडेट करता है
-        async function completePiPayment(paymentRecordId, listingId) {
-            console.log(`भुगतान पूरा हो रहा है और Firestore अपडेट कर रहा हूँ: ${paymentRecordId}`);
-            try {
-                // A. Payment Record अपडेट करें (स्थिति: paid)
-                const paymentsRef = collection(db, PRIVATE_COLLECTION_PATH('payments'));
-                // paymentRecordId (newPaymentId) द्वारा दस्तावेज़ (document) खोजें
-                const q = query(paymentsRef, where("id", "==", paymentRecordId), limit(1));
-                
-                const snapshot = await getDocs(q);
-                if (!snapshot.empty) {
-                    const docId = snapshot.docs[0].id;
-                    await updateDoc(doc(db, PRIVATE_COLLECTION_PATH('payments'), docId), {
-                        status: 'paid',
-                        completedAt: serverTimestamp(),
-                    });
+                } catch (error) {
+                    console.error("Firestore loading failed. Falling back to Local Storage.", error);
+                    status.textContent = "❌ Firestore लोड विफल। स्थानीय डेटा का उपयोग कर रहा है।";
+                    // Fallback to local storage if Firestore fails
+                    const storedListings = localStorage.getItem('barterListings');
+                    listings = storedListings ? JSON.parse(storedListings) : [];
                 }
+            } else {
+                // FALLBACK: Load from Local Storage (for local testing/MongoDB-like behavior)
+                const storedListings = localStorage.getItem('barterListings');
+                listings = storedListings ? JSON.parse(storedListings) : [
+                    // Mock Data to ensure something is visible
+                    { id: 'mock1', name: 'Pi T-Shirt', description: 'ब्रांडेड Pi T-Shirt, साइज़ L', price: 0.5, date: Date.now() - 86400000 },
+                    { id: 'mock2', name: 'Web Dev Service', description: 'एक घंटे की वेब डेवलपमेंट सर्विस।', price: 1.0, date: Date.now() - 172800000 },
+                    { id: 'mock3', name: 'Digital Art', description: 'कस्टम NFT डिजिटल आर्टवर्क।', price: 0.25, date: Date.now() },
+                ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-                // B. Listing Status अपडेट करें (स्थिति: sold)
-                const listingRef = doc(db, PUBLIC_COLLECTION_PATH('listings'), listingId);
-                await updateDoc(listingRef, {
-                    status: 'sold',
-                    soldAt: serverTimestamp(),
-                });
+                localStorage.setItem('barterListings', JSON.stringify(listings));
+                status.textContent = "✅ लोकल डेटा लोड हुआ।";
+            }
+            
+            renderListings(listings);
+        }
+
+        window.searchListings = function() {
+            const queryText = document.getElementById('search-input').value.toLowerCase();
+            if (!queryText) {
+                loadListings();
+                return;
+            }
+
+            const storedListings = localStorage.getItem('barterListings');
+            let allListings = storedListings ? JSON.parse(storedListings) : [];
+            
+            const filtered = allListings.filter(listing => 
+                listing.name.toLowerCase().includes(queryText) || 
+                listing.description.toLowerCase().includes(queryText)
+            );
+            renderListings(filtered);
+        }
+        
+        // --- Posting Logic ---
+
+        window.openPostModal = function() {
+            if (!isAuthenticated) {
+                showMessage("पोस्ट करने के लिए पहले Pi अकाउंट से साइन इन करें।", 'error');
+                handleSignIn();
+                return;
+            }
+            document.getElementById('post-modal').classList.remove('hidden');
+        }
+
+        window.closePostModal = function() {
+            document.getElementById('post-modal').classList.add('hidden');
+            document.getElementById('new-listing-form').reset();
+        }
+
+        window.submitNewListing = async function() {
+            const name = document.getElementById('item-name').value;
+            const description = document.getElementById('item-description').value;
+            const price = parseFloat(document.getElementById('item-price').value);
+
+            if (!isAuthenticated) {
+                showMessage("साइन इन करें।", 'error');
+                return;
+            }
+
+            const newListing = {
+                id: crypto.randomUUID(),
+                name,
+                description,
+                price,
+                userId: userId,
+                date: Date.now()
+            };
+
+            try {
+                if (IS_FIREBASE_ENABLED && db) {
+                    // Save to Firestore (Public Collection)
+                    const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'listings');
+                    await addDoc(collectionRef, newListing);
+                    showMessage("✅ लिस्टिंग सफलतापूर्वक पोस्ट हुई (Firestore)।", 'success');
+                } else {
+                    // Save to Local Storage (Fallback)
+                    const storedListings = localStorage.getItem('barterListings');
+                    const listings = storedListings ? JSON.parse(storedListings) : [];
+                    listings.unshift(newListing); // Add to the start
+                    localStorage.setItem('barterListings', JSON.stringify(listings));
+                    showMessage("✅ लिस्टिंग सफलतापूर्वक पोस्ट हुई (लोकल)।", 'success');
+                }
                 
-                showMessage('लेन-देन सफलतापूर्वक पूरा हुआ और लिस्टिंग बिक गई!', 'green');
+                closePostModal();
+                loadListings(); // Reload to show the new listing
 
             } catch (error) {
-                console.error("लेन-देन की स्थिति पूरी करने में गंभीर त्रुटि:", error);
-                showMessage('गंभीर त्रुटि: लेन-देन की स्थिति पूरी करने में विफल।', 'red');
+                console.error("Posting error:", error);
+                showMessage(`❌ पोस्टिंग विफल: ${error.message || error}`, 'error');
             }
         }
+        
+        // --- Pi SDK Mock Handlers ---
+
+        window.handleSignIn = function() {
+            if (isAuthenticated) {
+                Pi.signOut();
+            } else {
+                Pi.authenticate(['username', 'payments', 'wallet'], (auth) => {
+                    // Mock Authentication Successful
+                    if (auth.user) {
+                        // In a real app, you would use this auth token to sign into Firebase
+                        // Since this is a mock, we update the state directly
+                        updateAuthState({ uid: auth.user.uid, displayName: auth.user.username });
+                        showMessage(`👋 Pi से लॉग इन: ${auth.user.username}`, 'success');
+                    }
+                });
+            }
+        }
+        
+        window.barterItem = function(listingId) {
+            const storedListings = localStorage.getItem('barterListings');
+            const listings = storedListings ? JSON.parse(storedListings) : [];
+            const listing = listings.find(l => l.id === listingId);
+
+            if (!listing) return showMessage("लिस्टिंग नहीं मिली।", 'error');
+            if (!isAuthenticated) return showMessage("आइटम बार्टर करने के लिए साइन इन करें।", 'error');
+            
+            // Mock Pi Payment Flow
+            Pi.createPayment({
+                amount: listing.price,
+                memo: `Barter for ${listing.name} (ID: ${listingId})`,
+                metadata: { listingId: listingId },
+            }, {
+                onReadyForServerApproval: (paymentId) => {
+                    showMessage(`✅ पेमेंट शुरू हुआ: ${paymentId}. Pi Server पर अप्रूवल का इंतज़ार है।`, 'success');
+                    // Simulating successful server approval for the mock
+                    Pi.completePayment(paymentId, { txid: 'mock_tx_' + Date.now() });
+                },
+                onPaymentCompleted: (paymentId, txid) => {
+                    showMessage(`🎉 बार्टर सफल! ट्रांजेक्शन ID: ${txid}`, 'success');
+                    // In a real app, you would update the listing status in Firestore here.
+                },
+                onPaymentCancelled: () => {
+                    showMessage("❌ पेमेंट रद्द हो गया।", 'error');
+                },
+                onError: (error) => {
+                    showMessage(`❌ पेमेंट एरर: ${error.message}`, 'error');
+                }
+            });
+        }
+        
+        window.handlePayment = function() {
+            showMessage("Pi Wallet SDK से जुड़ रहा है...", 'success');
+            // This button uses a generic mock payment to show functionality
+            Pi.createPayment({
+                amount: 0.01,
+                memo: "Testing Pi Wallet SDK integration",
+                metadata: { reason: "Test Payment" },
+            }, {
+                onReadyForServerApproval: (paymentId) => {
+                    Pi.completePayment(paymentId, { txid: 'mock_tx_test_' + Date.now() });
+                },
+                onPaymentCompleted: (paymentId, txid) => {
+                    showMessage(`🎉 टेस्ट पेमेंट सफल! (0.01 Pi) TxID: ${txid}`, 'success');
+                },
+                onPaymentCancelled: () => {
+                    showMessage("❌ टेस्ट पेमेंट रद्द हो गया।", 'error');
+                },
+                onError: (error) => {
+                    showMessage(`❌ Pi SDK एरर: ${error.message}`, 'error');
+                }
+            });
+        }
+
+
+        // --- Initialization ---
+
+        function initApp() {
+            document.getElementById('loading-indicator').textContent = "शुरू हो रहा है...";
+            
+            // If Firebase is enabled, initialize it
+            if (IS_FIREBASE_ENABLED) {
+                console.log("Firebase is enabled. Trying to initialize...");
+                try {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    
+                    // Dynamic imports for Firebase (since it's an HTML file)
+                    import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js')
+                        .then(appModule => {
+                            const { initializeApp } = appModule;
+                            const app = initializeApp(firebaseConfig);
+
+                            Promise.all([
+                                import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js'),
+                                import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
+                            ]).then(([authModule, firestoreModule]) => {
+                                const { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } = authModule;
+                                const { getFirestore, collection, query, getDocs, addDoc } = firestoreModule;
+                                
+                                db = getFirestore(app);
+                                auth = getAuth(app);
+                                window.db = db; // Attach to window for easier access in console
+
+                                // Auth Setup (Mandatory)
+                                onAuthStateChanged(auth, (user) => {
+                                    if (user) {
+                                        updateAuthState(user);
+                                        document.getElementById('loading-indicator').textContent = "तैयार";
+                                    } else {
+                                        // Use custom token if provided, otherwise sign in anonymously
+                                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token.length > 10) {
+                                            signInWithCustomToken(auth, __initial_auth_token)
+                                                .then((userCredential) => updateAuthState(userCredential.user))
+                                                .catch((error) => {
+                                                    console.error("Custom Token Sign In Failed:", error);
+                                                    signInAnonymously(auth).then(userCredential => updateAuthState(userCredential.user));
+                                                });
+                                        } else {
+                                            signInAnonymously(auth).then(userCredential => updateAuthState(userCredential.user));
+                                        }
+                                    }
+                                    loadListings(); // Load listings after auth attempt
+                                });
+
+                                // Expose Firestore methods to global scope for submitNewListing
+                                window.collection = collection;
+                                window.addDoc = addDoc;
+                            }).catch(e => {
+                                console.error("Firebase SDK import failed:", e);
+                                showMessage("❌ Firebase SDK लोड नहीं हुआ। लोकल स्टोरेज का उपयोग हो रहा है।", 'error');
+                                initLocalApp();
+                            });
+                        })
+                        .catch(e => {
+                            console.error("Firebase App import failed:", e);
+                            showMessage("❌ Firebase ऐप लोड नहीं हुआ। लोकल स्टोरेज का उपयोग हो रहा है।", 'error');
+                            initLocalApp();
+                        });
+                } catch (e) {
+                    console.error("Firebase Config Parsing Error:", e);
+                    showMessage("❌ Firebase कॉन्फ़िग एरर। लोकल स्टोरेज का उपयोग हो रहा है।", 'error');
+                    initLocalApp();
+                }
+            } else {
+                // FALLBACK: Run the app in pure Local Storage mode
+                initLocalApp();
+            }
+        }
+        
+        function initLocalApp() {
+            document.getElementById('loading-indicator').textContent = "तैयार (लोकल)";
+            // Mock Auth State for local mode
+            updateAuthState({ uid: userId, displayName: 'Guest' });
+            loadListings();
+        }
+
+        // Expose functions to global scope
+        window.loadListings = loadListings;
+        
+        // Wait for all external scripts (like Tailwind) to load
+        window.onload = initApp;
+
     </script>
 </body>
 </html>
