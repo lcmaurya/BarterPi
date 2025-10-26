@@ -8,7 +8,7 @@
     <title>Barter-Pi Pro - Final UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://sdk.minepi.com/sdk.js"></script>
+    <script src="https://sdk.minepi.com/sdk.js"></script> 
     <style>
         body { font-family: 'Inter', sans-serif; }
         /* मुख्य पेज सामग्री के लिए CSS */
@@ -262,7 +262,8 @@
             alert("Starting Pi Transaction. Follow the prompts in the Pi Browser to clear the developer checklist...");
 
             try {
-                Pi.payments.create({
+                // Using Pi SDK v1 syntax for stability
+                Pi.api.payments.create({
                     amount: 1, // Test amount: 1 Pi
                     memo: "Test Transaction for Developer Checklist completion", 
                     metadata: { 
@@ -273,6 +274,7 @@
                     // Callback when transaction is approved by the user
                     onReadyForServerApproval: function(paymentId) {
                         alert("SUCCESS: Transaction Ready for Server Approval! CHECKLIST CLEARED.");
+                        // The Pi Network developer portal will detect this state.
                     },
                     // Callback if the transaction is cancelled by the user
                     onCancel: function(paymentId) {
