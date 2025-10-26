@@ -1,18 +1,433 @@
 <!DOCTYPE html>
 <html lang="hi">
-  <head>
+<head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Pi Network Barter Application"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Barter-Pi App</title>
-  </head>
-  <body>
-    <noscript>आपको ऐप चलाने के लिए JavaScript सक्षम करने की आवश्यकता है।</noscript>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM CDNs -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX transformation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Firebase CDNs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // --- GLOBAL VARIABLES (Canvas Environment) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- Firebase Initialization ---
+        window.app = firebaseConfig ? initializeApp(firebaseConfig) : null;
+        window.db = window.app ? getFirestore(window.app) : null;
+        window.auth = window.app ? getAuth(window.app) : null;
+
+        if (window.db) {
+            // Set logging for debugging
+            // import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+            // setLogLevel('debug');
+
+            // Initial Auth Attempt
+            (async () => {
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(window.auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(window.auth);
+                    }
+                    console.log("Firebase Auth initialized.");
+                } catch (error) {
+                    console.error("Firebase Auth Error on startup:", error);
+                }
+            })();
+        }
+
+        // Expose Firebase and utility functions globally for React component
+        window.firebase = {
+            auth: window.auth,
+            db: window.db,
+            initializeApp: initializeApp,
+            getAuth: getAuth,
+            getFirestore: getFirestore,
+            signInWithCustomToken: signInWithCustomToken,
+            signInAnonymously: signInAnonymously,
+            onAuthStateChanged: onAuthStateChanged,
+            collection: collection,
+            query: query,
+            onSnapshot: onSnapshot,
+            addDoc: addDoc,
+            serverTimestamp: serverTimestamp,
+            appId: appId
+        };
+    </script>
+
+    <!-- Pi SDK Mock for testing in the Canvas -->
+    <script src="https://cdn.jsdelivr.net/gh/ph0enix-dev/pi-sdk-mock@main/pi-sdk-mock.js"></script>
+
+    <script>
+        // Tailwind Configuration
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'pi-dark': '#2c2c2c',
+                        'pi-main': '#ffb33f', 
+                        'pi-light': '#fef3e4',
+                        'pi-blue': '#1e75ff',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            }
+        };
+    </script>
+</head>
+<body class="bg-gray-100 font-sans">
     <div id="root"></div>
-    <!-- React, Tailwind, और Firebase का कोड यहां लोड होता है -->
-  </body>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { Search, X } = lucide;
+
+        // --- Helper Components ---
+
+        // Simple alert/message box component
+        const MessageBox = ({ message, type, isVisible, onClose }) => {
+            if (!isVisible) return null;
+
+            const baseClasses = "fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl transition-opacity duration-300 flex items-center min-w-[250px]";
+            const typeClasses = type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white';
+
+            useEffect(() => {
+                const timer = setTimeout(() => onClose(), 4000);
+                return () => clearTimeout(timer);
+            }, [message]);
+
+            return (
+                <div className={`${baseClasses} ${typeClasses}`}>
+                    <p className="flex-grow mr-4">{message}</p>
+                    <button onClick={onClose} className="font-bold ml-2 p-1 rounded-full hover:bg-white hover:bg-opacity-20 transition">
+                        <X size={16} />
+                    </button>
+                </div>
+            );
+        };
+
+        // Modal Component for New Listing Form
+        const NewListingModal = ({ isModalOpen, setIsModalOpen, submitNewListing }) => {
+            if (!isModalOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300">
+                    <div className="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl transform transition-transform duration-300 scale-100">
+                        <h3 className="text-2xl font-bold text-pi-dark mb-6 border-b pb-2">नई वस्तु पोस्ट करें</h3>
+                        <form onSubmit={submitNewListing}>
+                            <div className="mb-4">
+                                <label htmlFor="item-name" className="block text-sm font-medium text-gray-700 mb-1">वस्तु का नाम</label>
+                                <input type="text" id="item-name" required className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main transition" />
+                            </div>
+                            <div className="mb-4">
+                                <label htmlFor="item-description" className="block text-sm font-medium text-gray-700 mb-1">विवरण</label>
+                                <textarea id="item-description" required className="mt-1 p-3 w-full border border-gray-300 rounded-lg h-24 focus:ring-pi-main focus:border-pi-main transition"></textarea>
+                            </div>
+                            <div className="mb-6">
+                                <label htmlFor="item-price" className="block text-sm font-medium text-gray-700 mb-1">Pi में कीमत (π)</label>
+                                <input type="number" id="item-price" step="0.0001" required className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main transition" />
+                            </div>
+                            <div className="flex justify-end space-x-4">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsModalOpen(false)} 
+                                    className="bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-400 transition shadow-md"
+                                >
+                                    रद्द करें
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="bg-pi-main text-pi-dark font-semibold py-2 px-4 rounded-lg hover:bg-yellow-400 transition shadow-md disabled:opacity-50"
+                                >
+                                    पोस्ट करें
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // --- Main App Component ---
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [listings, setListings] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [message, setMessage] = useState('');
+            const [messageType, setMessageType] = useState('success');
+            const [isMessageVisible, setIsMessageVisible] = useState(false);
+            const isFirebaseAvailable = !!window.firebase.db;
+
+            // Show temporary message
+            const showMessage = (msg, type = 'success') => {
+                setMessage(msg);
+                setMessageType(type);
+                setIsMessageVisible(true);
+            };
+
+            // --- Auth & Initialization (Re-evaluating user state) ---
+            useEffect(() => {
+                if (!isFirebaseAvailable) {
+                    setLoading(false);
+                    showMessage("❌ Firebase उपलब्ध नहीं है। कोई डेटाबेस कनेक्शन नहीं।", 'error');
+                    return;
+                }
+
+                const unsubscribe = window.firebase.onAuthStateChanged(window.firebase.auth, (currentUser) => {
+                    setUser(currentUser);
+                    setLoading(false);
+                    if (currentUser && !currentUser.isAnonymous) {
+                        showMessage(`👋 Pi से लॉग इन: ${currentUser.displayName || currentUser.uid.substring(0, 8)}`, 'success');
+                    } else if (currentUser && currentUser.isAnonymous) {
+                         showMessage("अतिथि के रूप में लॉग इन किया गया।", 'success');
+                    }
+                });
+
+                return () => unsubscribe();
+            }, []);
+
+            // --- Data Fetching (Firestore Listener) ---
+            useEffect(() => {
+                if (!isFirebaseAvailable || loading || !user) return;
+
+                // Collection path: /artifacts/{appId}/public/data/listings
+                const listingsCollectionPath = window.firebase.collection(window.firebase.db, 'artifacts', window.firebase.appId, 'public', 'data', 'listings');
+                const q = window.firebase.query(listingsCollectionPath);
+
+                const unsubscribe = window.firebase.onSnapshot(q, (snapshot) => {
+                    const fetchedListings = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    })).sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)); // Sort by date/timestamp
+
+                    setListings(fetchedListings);
+                }, (error) => {
+                    console.error("Firestore Snapshot Error:", error);
+                    showMessage("❌ लिस्टिंग लोड नहीं हो सकीं। फायरस्टोर नियमों की जाँच करें।", 'error');
+                });
+
+                return () => unsubscribe();
+            }, [loading, user, isFirebaseAvailable]);
+
+            // --- Handlers ---
+
+            const handlePiSignIn = () => {
+                if (!isFirebaseAvailable) {
+                    showMessage("Firebase उपलब्ध नहीं है। साइन इन काम नहीं करेगा।", 'error');
+                    return;
+                }
+
+                if (user && !user.isAnonymous) {
+                    // Mock Sign Out - In a real app, this would log out the custom token user
+                    window.firebase.auth.signOut();
+                    showMessage('साइन आउट सफल', 'success');
+                } else {
+                    // Mock Pi Authentication
+                    Pi.authenticate(['username', 'payments', 'wallet'], (authData) => {
+                        if (authData.user) {
+                             // This should ideally exchange the access token for a custom Firebase token,
+                             // but here we mock a successful sign-in by updating the state.
+                            const mockUser = { uid: authData.user.uid, isAnonymous: false, displayName: authData.user.username };
+                            setUser(mockUser);
+                            showMessage(`👋 Pi से लॉग इन: ${authData.user.username}`, 'success');
+                        }
+                    });
+                }
+            };
+
+            const submitNewListing = async (e) => {
+                e.preventDefault();
+                if (!isFirebaseAvailable) {
+                    showMessage("Firebase उपलब्ध नहीं। पोस्टिंग विफल।", 'error');
+                    return;
+                }
+                if (!user || user.isAnonymous) {
+                    showMessage("पोस्ट करने के लिए पहले Pi अकाउंट से साइन इन करें।", 'error');
+                    return;
+                }
+
+                const form = e.target;
+                const name = form.elements['item-name'].value;
+                const description = form.elements['item-description'].value;
+                const price = parseFloat(form.elements['item-price'].value);
+
+                try {
+                    const newListing = {
+                        name,
+                        description,
+                        price,
+                        userId: user.uid,
+                        date: window.firebase.serverTimestamp(),
+                    };
+
+                    const collectionRef = window.firebase.collection(window.firebase.db, 'artifacts', window.firebase.appId, 'public', 'data', 'listings');
+                    await window.firebase.addDoc(collectionRef, newListing);
+
+                    showMessage("✅ लिस्टिंग सफलतापूर्वक पोस्ट हुई।", 'success');
+                    setIsModalOpen(false);
+                    form.reset();
+                } catch (error) {
+                    console.error("Posting error:", error);
+                    showMessage(`❌ पोस्टिंग विफल: ${error.message}`, 'error');
+                }
+            };
+
+            const filteredListings = listings.filter(listing =>
+                listing.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                listing.description?.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
+            // Conditional class for the Sign In button
+            const piSignInButtonClass = user && !user.isAnonymous
+                ? 'bg-red-500 text-white hover:bg-red-600' // Sign Out style
+                : 'bg-pi-main text-pi-dark hover:bg-yellow-400'; // Sign In style
+
+            return (
+                <div className="min-h-screen">
+                    {/* Header & Navigation */}
+                    <header className="bg-pi-dark shadow-md sticky top-0 z-20">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
+                            <h1 className="text-2xl font-bold text-white">Barter-Pi</h1>
+                            <div className="flex items-center space-x-4">
+                                <span className="text-white text-sm hidden sm:block">
+                                    {loading ? 'लोड हो रहा है...' : (user ? (user.isAnonymous ? 'अतिथि' : user.displayName || 'उपयोगकर्ता') : 'साइन आउट')}
+                                </span>
+                                <button 
+                                    onClick={handlePiSignIn} 
+                                    className={`${piSignInButtonClass} font-semibold py-2 px-4 rounded-lg transition shadow-md`}
+                                >
+                                    {user && !user.isAnonymous ? 'साइन आउट' : 'साइन इन करें'}
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+
+                        {/* Listings Section */}
+                        <section className="mb-10 bg-white rounded-xl p-6 shadow-lg">
+                            <h2 className="text-2xl font-bold text-pi-dark mb-4">लेटेस्ट <span className="text-pi-main">Barter</span> लिस्टिंग (पंजीकृत वस्तुएं)</h2>
+                            
+                            {/* Search Bar */}
+                            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                                <div className="relative flex-grow">
+                                    <input 
+                                        type="text" 
+                                        placeholder="आइटम या कीवर्ड्स खोजें..." 
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main pl-10 transition"
+                                    />
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                </div>
+                            </div>
+                            
+                            {loading && <p className="text-center text-gray-500 my-6 text-lg">लिस्टिंग लोड हो रही है...</p>}
+
+                            {!isFirebaseAvailable && <p className="text-center text-red-500 my-6 text-lg">Firebase उपलब्ध नहीं है। लिस्टिंग नहीं दिखेंगी।</p>}
+
+                            <div id="listings-container" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                                {!loading && filteredListings.length === 0 && isFirebaseAvailable && (
+                                    <p className="text-center text-gray-500 my-6 text-lg col-span-full">कोई लिस्टिंग नहीं मिली।</p>
+                                )}
+                                {filteredListings.map(listing => (
+                                    <div key={listing.id} className="bg-white p-4 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition transform hover:scale-[1.01]">
+                                        <h3 className="text-xl font-semibold text-pi-dark truncate">{listing.name}</h3>
+                                        <p className="text-sm text-gray-500 mt-1 mb-3">
+                                            ID: {user && listing.userId === user.uid ? 'आपकी' : listing.userId?.substring(0, 8) || 'Unknown'} | 
+                                            {(listing.date?.toDate ? listing.date.toDate().toLocaleDateString('hi-IN') : 'Loading...')}
+                                        </p>
+                                        <p className="text-gray-700 h-12 overflow-hidden text-ellipsis">{listing.description}</p>
+                                        <div className="mt-4 flex justify-between items-center border-t pt-3">
+                                            <span className="text-2xl font-bold text-pi-main">{listing.price} <span className="text-base font-normal text-gray-600">π</span></span>
+                                            <button 
+                                                onClick={() => showMessage(`बार्टर फ़ंक्शनलिटी अभी उपलब्ध नहीं है।`, 'error')} 
+                                                className="bg-pi-blue text-white text-sm font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition shadow-md"
+                                            >
+                                                बार्टर करें
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+
+                        {/* Post New Barter Section */}
+                        <section className="mb-10 bg-white rounded-xl p-6 shadow-lg">
+                            <h2 className="text-2xl font-bold text-pi-dark mb-4">एक नई <span className="text-pi-main">Barter</span> पोस्ट करें (नई वस्तु)</h2>
+                            <p className="text-gray-600 mb-4">
+                                पोस्ट करने के लिए लॉग इन होना सुनिश्चित करें। आपका ID: <span className="font-semibold text-pi-dark">{user?.uid || 'अतिथि'}</span>
+                            </p>
+
+                            <button 
+                                onClick={() => setIsModalOpen(true)} 
+                                disabled={user?.isAnonymous || !isFirebaseAvailable}
+                                className={`font-semibold py-3 px-6 rounded-lg transition shadow-lg w-full sm:w-auto ${
+                                    user && !user.isAnonymous && isFirebaseAvailable ? 
+                                    'bg-yellow-500 text-pi-dark hover:bg-yellow-600' : 
+                                    'bg-gray-300 text-gray-600 cursor-not-allowed'
+                                }`}
+                            >
+                                + नई लिस्टिंग
+                            </button>
+                            {user && user.isAnonymous && <p className="text-sm text-red-500 mt-2">पोस्ट करने के लिए Pi से साइन इन करें।</p>}
+                            {!isFirebaseAvailable && <p className="text-sm text-red-500 mt-2">Firebase उपलब्ध नहीं है। पोस्टिंग अक्षम है।</p>}
+                        </section>
+
+                        {/* Pi Wallet & Orders Section */}
+                        <section className="bg-white rounded-xl p-6 shadow-lg">
+                            <h2 className="text-2xl font-bold text-pi-dark mb-4">Pi Wallet & Orders (ऑर्डर इतिहास)</h2>
+                            <p className="text-gray-600 mb-4">यह खंड Pi Wallet SDK से जुड़ेगा।</p>
+                            <button 
+                                onClick={() => showMessage('Pi पेमेंट फ़ंक्शनलिटी यहाँ एकीकृत होगी।', 'success')} 
+                                className="bg-pi-blue text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-600 transition shadow-md"
+                            >
+                                ऑर्डर देखें (भुगतान)
+                            </button>
+                        </section>
+
+                    </main>
+
+                    {/* Modal */}
+                    <NewListingModal 
+                        isModalOpen={isModalOpen} 
+                        setIsModalOpen={setIsModalOpen} 
+                        submitNewListing={submitNewListing} 
+                    />
+
+                    {/* Message Box */}
+                    <MessageBox 
+                        message={message} 
+                        type={messageType} 
+                        isVisible={isMessageVisible} 
+                        onClose={() => setIsMessageVisible(false)} 
+                    />
+                </div>
+            );
+        };
+
+        // Render the App
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
 </html>
