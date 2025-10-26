@@ -250,7 +250,7 @@
         ];
         var DUMMY_ORDERS = [
             { id: 'o1', item: 'iPhone 14 Pro', price: 450, status: 'Shipped', escrow: 'Active', type: 'buy' },
-            { id: 'o2', item: 'Laptop Repair', price: 35, status: 'Delivered', escrow: 'Released', type: 'sell' },
+            { id: 'o2', item: 'Laptop Repair', pricePi: 35, status: 'Delivered', escrow: 'Released', type: 'sell' },
         ];
 
         // --- PI SDK READY CHECK & INIT (Final Fix) ---
@@ -396,14 +396,14 @@
             }
         }
 
-        // --- LOGIN LOGIC ---
+        // --- LOGIN LOGIC (Active) ---
         function loginUser() {
             alert('Pi Network Login SDK call simulated. Logging in...');
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = 'block';
         }
 
-        // --- LISTING RENDERING (VANILLA JS) ---
+        // --- LISTING RENDERING (Active & Filtered) ---
         function renderListings() {
             var grid = document.getElementById('listings-grid');
             var html = '';
@@ -417,8 +417,10 @@
                  return;
             }
 
-            for (var i = 0; i < DUMMY_LISTINGS.length; i++) {
-                var listing = DUMMY_LISTINGS[i];
+            var listingsToRender = filteredListings.length > 0 ? filteredListings : DUMMY_LISTINGS; 
+
+            for (var i = 0; i < listingsToRender.length; i++) {
+                var listing = listingsToRender[i];
                 var statusClass = listing.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
                 
                 var itemImageText = listing.itemName.replace(/ /g, '+');
@@ -437,7 +439,7 @@
             grid.innerHTML = html;
         }
 
-        // --- ORDER RENDERING (VANILLA JS) ---
+        // --- ORDER RENDERING (Active) ---
         function renderOrders() {
             var listContainer = document.getElementById('orders-list');
             var html = '<h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">📦 मेरे सभी ऑर्डर्स</h3>';
@@ -450,7 +452,7 @@
                 html += '<div class="mb-4 p-4 border rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center ' + (order.type === 'buy' ? 'bg-blue-50' : 'bg-green-50') + '">';
                 html += '<div>';
                 html += '<p class="font-semibold text-lg">' + order.item + ' <span class="text-xs font-medium text-gray-500">(' + (order.type === 'buy' ? 'खरीद' : 'बिक्री') + ')</span></p>';
-                html += '<p class="text-sm text-gray-500">कीमत: **' + order.price + ' Pi** | Escrow: ' + escrowStatus + '</p>';
+                html += '<p class="text-sm text-gray-500">कीमत: **' + order.pricePi + ' Pi** | Escrow: ' + escrowStatus + '</p>';
                 html += '</div>';
                 html += '<div class="text-right mt-2 sm:mt-0">';
                 html += '<span class="px-3 py-1 text-sm font-bold rounded-full block ' + statusClass + '">' + order.status + '</span>';
@@ -462,22 +464,17 @@
             listContainer.innerHTML = html;
         }
         
-        // --- FILTER EVENT LISTENER ---
-        window.addEventListener('load', function() {
+        // --- INITIALIZATION (Final Fix) ---
+        window.onload = function() {
+            setupNavigation();
+            
+            // फ़िल्टर इवेंट को यहाँ जोड़ें (Correct Activation for Filter)
             var categoryFilter = document.getElementById('category-filter');
             if (categoryFilter) {
                 categoryFilter.addEventListener('change', renderListings);
             }
-        });
 
-
-        // --- INITIALIZATION ---
-        window.onload = function() {
-            setupNavigation();
-            renderListings(); // Load listings on Home page
+            renderListings(); // Load initial listings on Home page
             loadPiSdkScript(); // START the SDK loading process
         };
     </script>
-
-</body>
-</html>
