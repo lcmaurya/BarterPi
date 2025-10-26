@@ -377,14 +377,18 @@
 
             if (userInput === '') return;
 
-            // DUMMY MESSAGE SUBMIT: User message added to the main chat container
+            // 1. Add User Message (Current User is assumed to be "User")
             addMessageToChat('chat-history-container', 'User', userInput);
             inputField.value = ''; 
 
-            // DUMMY REPLY
+            // 2. DUMMY REPLY
             setTimeout(function() {
                 addMessageToChat('chat-history-container', 'Other', 'जी, बिल्कुल। मैं जल्द ही आपको शिपिंग डिटेल्स भेजता हूँ।');
             }, 1500); 
+            
+            // Ensure chat history scrolls down immediately after sending
+            var chatContainer = document.getElementById('chat-history-container');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
 
