@@ -1,4 +1,4 @@
-<!-- Barter-Pi Web Application - Local Storage / MongoDB Fallback -->
+<!-- Barter-Pi Web Application - Local Storage / MongoDB Fallback - V2 (100% Local Mode) -->
 <!DOCTYPE html>
 <html lang="hi">
 <head>
@@ -57,7 +57,8 @@
                 </button>
             </div>
             
-            <p id="loading-status" class="text-center text-gray-500 my-6 text-lg">Firestore से लिस्टिंग लोड हो रही है...</p>
+            <!-- **यह टेक्स्ट अब बदला जा चुका है, ताकि Firestore का नाम हट जाए** -->
+            <p id="loading-status" class="text-center text-gray-500 my-6 text-lg">लोकल डेटा लोड हो रहा है...</p>
 
             <div id="listings-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                 <!-- Listings will be injected here -->
@@ -129,7 +130,8 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // Mandate
         
         // Use a flag to bypass Firebase/Firestore if config is missing (for local/testing mode)
-        const IS_FIREBASE_ENABLED = typeof __firebase_config !== 'undefined' && __firebase_config.length > 10;
+        // ** Firebase को अनदेखा करने के लिए यह फ़्लैग अब पक्का False होगा **
+        const IS_FIREBASE_ENABLED = false; // Forced to false to ensure local mode
         
         // --- Utility Functions ---
 
@@ -197,29 +199,14 @@
         async function loadListings() {
             const status = document.getElementById('loading-status');
             status.classList.remove('hidden');
-            status.textContent = "लिस्टिंग लोड हो रही है...";
+            status.textContent = "लोकल डेटा लोड हो रहा है...";
 
             let listings = [];
             
+            // ** अब यह कोड 100% लोकल स्टोरेज से ही डेटा लोड करेगा **
             if (IS_FIREBASE_ENABLED && db) {
-                // If Firebase is enabled and initialized, try to load from Firestore
-                try {
-                    console.log("Attempting to load listings from Firestore...");
-                    // Fallback to simpler query just in case the app ID path fails
-                    const listingsCol = await getDocs(query(collection(db, 'listings')));
-                    listings = listingsCol.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    
-                    // Sorting is done client-side to avoid Firestore index issues
-                    listings.sort((a, b) => new Date(b.date) - new Date(a.date));
-                    status.textContent = "Firestore से लिस्टिंग लोड हुई।";
-
-                } catch (error) {
-                    console.error("Firestore loading failed. Falling back to Local Storage.", error);
-                    status.textContent = "❌ Firestore लोड विफल। स्थानीय डेटा का उपयोग कर रहा है।";
-                    // Fallback to local storage if Firestore fails
-                    const storedListings = localStorage.getItem('barterListings');
-                    listings = storedListings ? JSON.parse(storedListings) : [];
-                }
+                // This block should theoretically never run now
+                status.textContent = "❌ अनपेक्षित Firebase लोड।";
             } else {
                 // FALLBACK: Load from Local Storage (for local testing/MongoDB-like behavior)
                 const storedListings = localStorage.getItem('barterListings');
@@ -290,19 +277,12 @@
             };
 
             try {
-                if (IS_FIREBASE_ENABLED && db) {
-                    // Save to Firestore (Public Collection)
-                    const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'listings');
-                    await addDoc(collectionRef, newListing);
-                    showMessage("✅ लिस्टिंग सफलतापूर्वक पोस्ट हुई (Firestore)।", 'success');
-                } else {
-                    // Save to Local Storage (Fallback)
-                    const storedListings = localStorage.getItem('barterListings');
-                    const listings = storedListings ? JSON.parse(storedListings) : [];
-                    listings.unshift(newListing); // Add to the start
-                    localStorage.setItem('barterListings', JSON.stringify(listings));
-                    showMessage("✅ लिस्टिंग सफलतापूर्वक पोस्ट हुई (लोकल)।", 'success');
-                }
+                // Save to Local Storage (Fallback is the only mode now)
+                const storedListings = localStorage.getItem('barterListings');
+                const listings = storedListings ? JSON.parse(storedListings) : [];
+                listings.unshift(newListing); // Add to the start
+                localStorage.setItem('barterListings', JSON.stringify(listings));
+                showMessage("✅ लिस्टिंग सफलतापूर्वक पोस्ट हुई (लोकल)।", 'success');
                 
                 closePostModal();
                 loadListings(); // Reload to show the new listing
@@ -322,8 +302,6 @@
                 Pi.authenticate(['username', 'payments', 'wallet'], (auth) => {
                     // Mock Authentication Successful
                     if (auth.user) {
-                        // In a real app, you would use this auth token to sign into Firebase
-                        // Since this is a mock, we update the state directly
                         updateAuthState({ uid: auth.user.uid, displayName: auth.user.username });
                         showMessage(`👋 Pi से लॉग इन: ${auth.user.username}`, 'success');
                     }
@@ -352,7 +330,6 @@
                 },
                 onPaymentCompleted: (paymentId, txid) => {
                     showMessage(`🎉 बार्टर सफल! ट्रांजेक्शन ID: ${txid}`, 'success');
-                    // In a real app, you would update the listing status in Firestore here.
                 },
                 onPaymentCancelled: () => {
                     showMessage("❌ पेमेंट रद्द हो गया।", 'error');
@@ -392,73 +369,8 @@
         function initApp() {
             document.getElementById('loading-indicator').textContent = "शुरू हो रहा है...";
             
-            // If Firebase is enabled, initialize it
-            if (IS_FIREBASE_ENABLED) {
-                console.log("Firebase is enabled. Trying to initialize...");
-                try {
-                    const firebaseConfig = JSON.parse(__firebase_config);
-                    
-                    // Dynamic imports for Firebase (since it's an HTML file)
-                    import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js')
-                        .then(appModule => {
-                            const { initializeApp } = appModule;
-                            const app = initializeApp(firebaseConfig);
-
-                            Promise.all([
-                                import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js'),
-                                import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js')
-                            ]).then(([authModule, firestoreModule]) => {
-                                const { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } = authModule;
-                                const { getFirestore, collection, query, getDocs, addDoc } = firestoreModule;
-                                
-                                db = getFirestore(app);
-                                auth = getAuth(app);
-                                window.db = db; // Attach to window for easier access in console
-
-                                // Auth Setup (Mandatory)
-                                onAuthStateChanged(auth, (user) => {
-                                    if (user) {
-                                        updateAuthState(user);
-                                        document.getElementById('loading-indicator').textContent = "तैयार";
-                                    } else {
-                                        // Use custom token if provided, otherwise sign in anonymously
-                                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token.length > 10) {
-                                            signInWithCustomToken(auth, __initial_auth_token)
-                                                .then((userCredential) => updateAuthState(userCredential.user))
-                                                .catch((error) => {
-                                                    console.error("Custom Token Sign In Failed:", error);
-                                                    signInAnonymously(auth).then(userCredential => updateAuthState(userCredential.user));
-                                                });
-                                        } else {
-                                            signInAnonymously(auth).then(userCredential => updateAuthState(userCredential.user));
-                                        }
-                                    }
-                                    loadListings(); // Load listings after auth attempt
-                                });
-
-                                // Expose Firestore methods to global scope for submitNewListing
-                                window.collection = collection;
-                                window.addDoc = addDoc;
-                            }).catch(e => {
-                                console.error("Firebase SDK import failed:", e);
-                                showMessage("❌ Firebase SDK लोड नहीं हुआ। लोकल स्टोरेज का उपयोग हो रहा है।", 'error');
-                                initLocalApp();
-                            });
-                        })
-                        .catch(e => {
-                            console.error("Firebase App import failed:", e);
-                            showMessage("❌ Firebase ऐप लोड नहीं हुआ। लोकल स्टोरेज का उपयोग हो रहा है।", 'error');
-                            initLocalApp();
-                        });
-                } catch (e) {
-                    console.error("Firebase Config Parsing Error:", e);
-                    showMessage("❌ Firebase कॉन्फ़िग एरर। लोकल स्टोरेज का उपयोग हो रहा है।", 'error');
-                    initLocalApp();
-                }
-            } else {
-                // FALLBACK: Run the app in pure Local Storage mode
-                initLocalApp();
-            }
+            // ** 100% Local Mode Initialization **
+            initLocalApp();
         }
         
         function initLocalApp() {
