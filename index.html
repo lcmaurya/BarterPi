@@ -11,79 +11,78 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <!-- Babel for JSX transformation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide Icons CDN -->
+    
+    <!-- Lucide Icons CDN (for Search icon) -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- Firebase CDNs -->
+    <!-- Firebase CDNs (Modules used by the app) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, query, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // --- GLOBAL VARIABLES (Canvas Environment) ---
+        // Render environment variables are made available through these global constants.
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         // --- Firebase Initialization ---
+        // Initialize the app if config exists, otherwise set to null.
         window.app = firebaseConfig ? initializeApp(firebaseConfig) : null;
         window.db = window.app ? getFirestore(window.app) : null;
         window.auth = window.app ? getAuth(window.app) : null;
 
         if (window.db) {
-            // Set logging for debugging
-            // import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-            // setLogLevel('debug');
-
-            // Initial Auth Attempt
+            // Initial Auth Attempt: Sign in with custom token or anonymously.
             (async () => {
                 try {
                     if (initialAuthToken) {
                         await signInWithCustomToken(window.auth, initialAuthToken);
+                        console.log("Firebase: Signed in with Custom Token.");
                     } else {
                         await signInAnonymously(window.auth);
+                        console.log("Firebase: Signed in Anonymously.");
                     }
-                    console.log("Firebase Auth initialized.");
                 } catch (error) {
                     console.error("Firebase Auth Error on startup:", error);
                 }
             })();
+        } else {
+            console.warn("Firebase Config missing. Running in disconnected mode.");
         }
 
-        // Expose Firebase and utility functions globally for React component
+        // Expose Firebase and utility functions globally for the React component to use.
         window.firebase = {
             auth: window.auth,
             db: window.db,
-            initializeApp: initializeApp,
-            getAuth: getAuth,
-            getFirestore: getFirestore,
-            signInWithCustomToken: signInWithCustomToken,
-            signInAnonymously: signInAnonymously,
             onAuthStateChanged: onAuthStateChanged,
             collection: collection,
             query: query,
             onSnapshot: onSnapshot,
             addDoc: addDoc,
             serverTimestamp: serverTimestamp,
-            appId: appId
+            appId: appId,
+            isAvailable: !!window.db
         };
     </script>
 
-    <!-- Pi SDK Mock for testing in the Canvas -->
+    <!-- Pi SDK Mock for testing in the Canvas (required for Barter/Payment functionality) -->
     <script src="https://cdn.jsdelivr.net/gh/ph0enix-dev/pi-sdk-mock@main/pi-sdk-mock.js"></script>
 
     <script>
-        // Tailwind Configuration
+        // Tailwind Configuration (Theme setup)
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
                         'pi-dark': '#2c2c2c',
-                        'pi-main': '#ffb33f', 
+                        'pi-main': '#ffb33f', // Yellowish Gold
                         'pi-light': '#fef3e4',
                         'pi-blue': '#1e75ff',
                     },
                     fontFamily: {
+                        // Using 'Inter' as specified in guidelines
                         sans: ['Inter', 'sans-serif'],
                     },
                 },
@@ -92,20 +91,24 @@
     </script>
 </head>
 <body class="bg-gray-100 font-sans">
+    <!-- Main root element for React -->
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
-        const { Search, X } = lucide;
+        // Import necessary hooks and components from global React/Lucide
+        const { useState, useEffect, useCallback } = React;
+        const { Search, X, ShoppingCart, User, Send } = lucide;
 
-        // --- Helper Components ---
+        // --- Utility Components ---
 
-        // Simple alert/message box component
+        /**
+         * MessageBox Component: Displays temporary success/error messages.
+         */
         const MessageBox = ({ message, type, isVisible, onClose }) => {
             if (!isVisible) return null;
 
-            const baseClasses = "fixed top-4 right-4 z-50 p-4 rounded-lg shadow-xl transition-opacity duration-300 flex items-center min-w-[250px]";
-            const typeClasses = type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white';
+            const baseClasses = "fixed top-4 right-4 z-50 p-4 rounded-xl shadow-2xl transition-opacity duration-300 flex items-center min-w-[300px] border";
+            const typeClasses = type === 'error' ? 'bg-red-600 text-white border-red-800' : 'bg-green-600 text-white border-green-800';
 
             useEffect(() => {
                 const timer = setTimeout(() => onClose(), 4000);
@@ -113,52 +116,135 @@
             }, [message]);
 
             return (
-                <div className={`${baseClasses} ${typeClasses}`}>
-                    <p className="flex-grow mr-4">{message}</p>
-                    <button onClick={onClose} className="font-bold ml-2 p-1 rounded-full hover:bg-white hover:bg-opacity-20 transition">
-                        <X size={16} />
+                <div className={`${baseClasses} ${typeClasses} opacity-100`}>
+                    <p className="flex-grow mr-4 font-medium">{message}</p>
+                    <button onClick={onClose} className="font-bold ml-2 p-1 rounded-full transition hover:bg-white hover:bg-opacity-20">
+                        <X size={18} />
                     </button>
                 </div>
             );
         };
 
-        // Modal Component for New Listing Form
-        const NewListingModal = ({ isModalOpen, setIsModalOpen, submitNewListing }) => {
+        /**
+         * NewListingModal Component: Form for posting a new Barter item.
+         */
+        const NewListingModal = ({ isModalOpen, setIsModalOpen, onSubmit, user }) => {
             if (!isModalOpen) return null;
 
+            // Form state for better control
+            const [name, setName] = useState('');
+            const [description, setDescription] = useState('');
+            const [price, setPrice] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSubmit({ name, description, price: parseFloat(price) });
+                // Reset form state after submission attempt
+                setName('');
+                setDescription('');
+                setPrice('');
+                setIsModalOpen(false);
+            };
+
             return (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300">
-                    <div className="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl transform transition-transform duration-300 scale-100">
-                        <h3 className="text-2xl font-bold text-pi-dark mb-6 border-b pb-2">नई वस्तु पोस्ट करें</h3>
-                        <form onSubmit={submitNewListing}>
+                <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4 transition-opacity duration-300 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-8 shadow-2xl transform transition-transform duration-300 scale-100">
+                        <div className="flex justify-between items-center mb-6 border-b pb-3">
+                            <h3 className="text-2xl font-bold text-pi-dark">नई वस्तु पोस्ट करें</h3>
+                            <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-800 transition p-2 rounded-full hover:bg-gray-100">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        
+                        <form onSubmit={handleSubmit}>
                             <div className="mb-4">
                                 <label htmlFor="item-name" className="block text-sm font-medium text-gray-700 mb-1">वस्तु का नाम</label>
-                                <input type="text" id="item-name" required className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main transition" />
+                                <input 
+                                    type="text" 
+                                    id="item-name" 
+                                    required 
+                                    value={name} 
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main transition shadow-sm" 
+                                />
                             </div>
                             <div className="mb-4">
-                                <label htmlFor="item-description" className="block text-sm font-medium text-gray-700 mb-1">विवरण</label>
-                                <textarea id="item-description" required className="mt-1 p-3 w-full border border-gray-300 rounded-lg h-24 focus:ring-pi-main focus:border-pi-main transition"></textarea>
+                                <label htmlFor="item-description" className="block text-sm font-medium text-gray-700 mb-1">विवरण (Description)</label>
+                                <textarea 
+                                    id="item-description" 
+                                    required 
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    className="p-3 w-full border border-gray-300 rounded-lg h-24 focus:ring-pi-main focus:border-pi-main transition shadow-sm"
+                                ></textarea>
                             </div>
                             <div className="mb-6">
                                 <label htmlFor="item-price" className="block text-sm font-medium text-gray-700 mb-1">Pi में कीमत (π)</label>
-                                <input type="number" id="item-price" step="0.0001" required className="mt-1 p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main transition" />
+                                <input 
+                                    type="number" 
+                                    id="item-price" 
+                                    step="0.0001" 
+                                    required 
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value)}
+                                    className="p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main transition shadow-sm"
+                                />
                             </div>
                             <div className="flex justify-end space-x-4">
                                 <button 
                                     type="button" 
                                     onClick={() => setIsModalOpen(false)} 
-                                    className="bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-400 transition shadow-md"
+                                    className="bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg hover:bg-gray-500 transition shadow-md"
                                 >
                                     रद्द करें
                                 </button>
                                 <button 
                                     type="submit" 
-                                    className="bg-pi-main text-pi-dark font-semibold py-2 px-4 rounded-lg hover:bg-yellow-400 transition shadow-md disabled:opacity-50"
+                                    className="bg-pi-main text-pi-dark font-semibold py-2 px-4 rounded-lg hover:bg-yellow-400 transition shadow-md"
                                 >
-                                    पोस्ट करें
+                                    <Send size={18} className="inline-block mr-1" /> पोस्ट करें
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            );
+        };
+
+        /**
+         * ListingCard Component: Displays a single listing item.
+         */
+        const ListingCard = ({ listing, user, onBarterClick }) => {
+            const isOwner = user?.uid === listing.userId;
+
+            return (
+                <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition transform hover:scale-[1.01] flex flex-col justify-between">
+                    <div>
+                        <h3 className="text-xl font-semibold text-pi-dark truncate">{listing.name}</h3>
+                        <p className="text-xs text-gray-500 mt-1 mb-3">
+                            {/* Display short user ID or 'Your Listing' */}
+                            {isOwner ? 'आपकी लिस्टिंग' : `Seller: ${listing.userId?.substring(0, 8) || 'Unknown'}`} | 
+                            {/* Format date nicely */}
+                            {listing.date?.toDate ? listing.date.toDate().toLocaleDateString('hi-IN', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Loading...'}
+                        </p>
+                        <p className="text-gray-700 h-16 overflow-hidden text-ellipsis mb-4">{listing.description}</p>
+                    </div>
+                    
+                    <div className="mt-4 flex justify-between items-center border-t pt-3">
+                        <span className="text-3xl font-extrabold text-pi-main">
+                            {listing.price} <span className="text-lg font-medium text-gray-600">π</span>
+                        </span>
+                        <button 
+                            onClick={() => onBarterClick(listing)} 
+                            disabled={isOwner}
+                            className={`text-white text-sm font-semibold py-2 px-4 rounded-lg transition shadow-md ${
+                                isOwner 
+                                    ? 'bg-gray-400 cursor-not-allowed' 
+                                    : 'bg-pi-blue hover:bg-blue-600'
+                            }`}
+                        >
+                            {isOwner ? 'आपकी वस्तु' : 'बार्टर करें'}
+                        </button>
                     </div>
                 </div>
             );
@@ -176,49 +262,53 @@
             const [message, setMessage] = useState('');
             const [messageType, setMessageType] = useState('success');
             const [isMessageVisible, setIsMessageVisible] = useState(false);
-            const isFirebaseAvailable = !!window.firebase.db;
+            
+            // Check Firebase availability once
+            const isFirebaseAvailable = window.firebase.isAvailable;
 
-            // Show temporary message
-            const showMessage = (msg, type = 'success') => {
+            // --- Message Handler (Wrapped in useCallback for stability) ---
+            const showMessage = useCallback((msg, type = 'success') => {
                 setMessage(msg);
                 setMessageType(type);
                 setIsMessageVisible(true);
-            };
+            }, []);
 
-            // --- Auth & Initialization (Re-evaluating user state) ---
+            // --- Auth & Initialization Hook ---
             useEffect(() => {
                 if (!isFirebaseAvailable) {
                     setLoading(false);
-                    showMessage("❌ Firebase उपलब्ध नहीं है। कोई डेटाबेस कनेक्शन नहीं।", 'error');
+                    showMessage("❌ Firebase कॉन्फिग उपलब्ध नहीं। डेटाबेस कनेक्शन अक्षम।", 'error');
                     return;
                 }
 
+                // Listen for authentication state changes
                 const unsubscribe = window.firebase.onAuthStateChanged(window.firebase.auth, (currentUser) => {
                     setUser(currentUser);
                     setLoading(false);
                     if (currentUser && !currentUser.isAnonymous) {
+                        // Show sign-in success for non-anonymous users
                         showMessage(`👋 Pi से लॉग इन: ${currentUser.displayName || currentUser.uid.substring(0, 8)}`, 'success');
-                    } else if (currentUser && currentUser.isAnonymous) {
-                         showMessage("अतिथि के रूप में लॉग इन किया गया।", 'success');
                     }
                 });
 
-                return () => unsubscribe();
-            }, []);
+                return () => unsubscribe(); // Cleanup listener
+            }, [isFirebaseAvailable, showMessage]);
 
-            // --- Data Fetching (Firestore Listener) ---
+            // --- Data Fetching (Firestore Listener Hook) ---
             useEffect(() => {
                 if (!isFirebaseAvailable || loading || !user) return;
 
-                // Collection path: /artifacts/{appId}/public/data/listings
+                // Define the public collection path for shared listings
+                // Path: /artifacts/{appId}/public/data/listings
                 const listingsCollectionPath = window.firebase.collection(window.firebase.db, 'artifacts', window.firebase.appId, 'public', 'data', 'listings');
                 const q = window.firebase.query(listingsCollectionPath);
 
+                // Set up real-time listener (onSnapshot)
                 const unsubscribe = window.firebase.onSnapshot(q, (snapshot) => {
                     const fetchedListings = snapshot.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
-                    })).sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)); // Sort by date/timestamp
+                    })).sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)); // Sort by most recent
 
                     setListings(fetchedListings);
                 }, (error) => {
@@ -226,50 +316,43 @@
                     showMessage("❌ लिस्टिंग लोड नहीं हो सकीं। फायरस्टोर नियमों की जाँच करें।", 'error');
                 });
 
-                return () => unsubscribe();
-            }, [loading, user, isFirebaseAvailable]);
+                return () => unsubscribe(); // Cleanup listener
+            }, [loading, user, isFirebaseAvailable, showMessage]);
 
-            // --- Handlers ---
-
+            // --- Authentication Handler ---
             const handlePiSignIn = () => {
                 if (!isFirebaseAvailable) {
-                    showMessage("Firebase उपलब्ध नहीं है। साइन इन काम नहीं करेगा।", 'error');
+                    showMessage("Firebase उपलब्ध नहीं। साइन इन अक्षम।", 'error');
                     return;
                 }
 
                 if (user && !user.isAnonymous) {
-                    // Mock Sign Out - In a real app, this would log out the custom token user
-                    window.firebase.auth.signOut();
-                    showMessage('साइन आउट सफल', 'success');
+                    // Sign Out Logic
+                    window.firebase.auth.signOut().then(() => {
+                        showMessage('साइन आउट सफल', 'success');
+                    }).catch(error => {
+                        showMessage(`साइन आउट एरर: ${error.message}`, 'error');
+                    });
                 } else {
-                    // Mock Pi Authentication
+                    // Mock Pi Authentication Flow
                     Pi.authenticate(['username', 'payments', 'wallet'], (authData) => {
                         if (authData.user) {
-                             // This should ideally exchange the access token for a custom Firebase token,
-                             // but here we mock a successful sign-in by updating the state.
+                             // In a real app, this would involve server-side token exchange.
+                             // Here, we just rely on the anonymous user or mock a successful login.
                             const mockUser = { uid: authData.user.uid, isAnonymous: false, displayName: authData.user.username };
                             setUser(mockUser);
                             showMessage(`👋 Pi से लॉग इन: ${authData.user.username}`, 'success');
                         }
+                    }, (error) => {
+                        showMessage(`Pi साइन इन विफल: ${error.message}`, 'error');
                     });
                 }
             };
 
-            const submitNewListing = async (e) => {
-                e.preventDefault();
-                if (!isFirebaseAvailable) {
-                    showMessage("Firebase उपलब्ध नहीं। पोस्टिंग विफल।", 'error');
-                    return;
-                }
-                if (!user || user.isAnonymous) {
-                    showMessage("पोस्ट करने के लिए पहले Pi अकाउंट से साइन इन करें।", 'error');
-                    return;
-                }
-
-                const form = e.target;
-                const name = form.elements['item-name'].value;
-                const description = form.elements['item-description'].value;
-                const price = parseFloat(form.elements['item-price'].value);
+            // --- New Listing Submission Handler ---
+            const submitNewListing = async ({ name, description, price }) => {
+                if (!isFirebaseAvailable) return showMessage("Firebase उपलब्ध नहीं। पोस्टिंग विफल।", 'error');
+                if (!user || user.isAnonymous) return showMessage("पोस्ट करने के लिए पहले Pi अकाउंट से साइन इन करें।", 'error');
 
                 try {
                     const newListing = {
@@ -278,45 +361,83 @@
                         price,
                         userId: user.uid,
                         date: window.firebase.serverTimestamp(),
+                        status: 'available'
                     };
 
                     const collectionRef = window.firebase.collection(window.firebase.db, 'artifacts', window.firebase.appId, 'public', 'data', 'listings');
                     await window.firebase.addDoc(collectionRef, newListing);
 
                     showMessage("✅ लिस्टिंग सफलतापूर्वक पोस्ट हुई।", 'success');
-                    setIsModalOpen(false);
-                    form.reset();
                 } catch (error) {
                     console.error("Posting error:", error);
                     showMessage(`❌ पोस्टिंग विफल: ${error.message}`, 'error');
                 }
             };
 
+            // --- Barter/Payment Handler (Mock) ---
+            const handleBarterClick = (listing) => {
+                if (!user || user.isAnonymous) {
+                    showMessage("आइटम बार्टर करने के लिए Pi से साइन इन करें।", 'error');
+                    return;
+                }
+                
+                showMessage(`💸 ${listing.price}π के लिए बार्टर शुरू हो रहा है...`, 'success');
+
+                // Mock Pi Payment Flow
+                Pi.createPayment({
+                    amount: listing.price,
+                    memo: `Barter for ${listing.name} (ID: ${listing.id})`,
+                    metadata: { listingId: listing.id, buyerId: user.uid },
+                }, {
+                    onReadyForServerApproval: (paymentId) => {
+                        showMessage(`✅ पेमेंट शुरू हुआ: ${paymentId}. Pi Server पर अप्रूवल का इंतज़ार है।`, 'success');
+                        // Simulating successful server approval for the mock
+                        setTimeout(() => {
+                             Pi.completePayment(paymentId, { txid: 'mock_tx_' + Date.now() });
+                        }, 1000);
+                    },
+                    onPaymentCompleted: (paymentId, txid) => {
+                        showMessage(`🎉 बार्टर सफल! ट्रांजेक्शन ID: ${txid}`, 'success');
+                        // Here, you would typically update the listing status in Firestore to 'sold'
+                    },
+                    onPaymentCancelled: () => {
+                        showMessage("❌ पेमेंट रद्द हो गया।", 'error');
+                    },
+                    onError: (error) => {
+                        showMessage(`❌ पेमेंट एरर: ${error.message}`, 'error');
+                    }
+                });
+            };
+
+            // --- Rendering Logic ---
+
             const filteredListings = listings.filter(listing =>
                 listing.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 listing.description?.toLowerCase().includes(searchQuery.toLowerCase())
             );
-
-            // Conditional class for the Sign In button
+            
             const piSignInButtonClass = user && !user.isAnonymous
-                ? 'bg-red-500 text-white hover:bg-red-600' // Sign Out style
-                : 'bg-pi-main text-pi-dark hover:bg-yellow-400'; // Sign In style
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-pi-main text-pi-dark hover:bg-yellow-400';
 
+            const userIdDisplay = user ? (user.isAnonymous ? 'अतिथि (Guest)' : user.uid) : 'अतिथि (Not signed in)';
+            
             return (
                 <div className="min-h-screen">
                     {/* Header & Navigation */}
-                    <header className="bg-pi-dark shadow-md sticky top-0 z-20">
+                    <header className="bg-pi-dark shadow-xl sticky top-0 z-20">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-                            <h1 className="text-2xl font-bold text-white">Barter-Pi</h1>
+                            <h1 className="text-3xl font-extrabold text-white tracking-wider">Barter<span className="text-pi-main">-Pi</span></h1>
                             <div className="flex items-center space-x-4">
                                 <span className="text-white text-sm hidden sm:block">
-                                    {loading ? 'लोड हो रहा है...' : (user ? (user.isAnonymous ? 'अतिथि' : user.displayName || 'उपयोगकर्ता') : 'साइन आउट')}
+                                    <User size={16} className="inline-block mr-1" />
+                                    {loading ? 'लोड हो रहा है...' : (user && !user.isAnonymous ? (user.displayName || 'उपयोगकर्ता') : 'अतिथि')}
                                 </span>
                                 <button 
                                     onClick={handlePiSignIn} 
-                                    className={`${piSignInButtonClass} font-semibold py-2 px-4 rounded-lg transition shadow-md`}
+                                    className={`${piSignInButtonClass} font-semibold py-2 px-4 rounded-lg transition shadow-lg`}
                                 >
-                                    {user && !user.isAnonymous ? 'साइन आउट' : 'साइन इन करें'}
+                                    {user && !user.isAnonymous ? 'साइन आउट' : 'Pi से साइन इन करें'}
                                 </button>
                             </div>
                         </div>
@@ -325,58 +446,50 @@
                     <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
 
                         {/* Listings Section */}
-                        <section className="mb-10 bg-white rounded-xl p-6 shadow-lg">
-                            <h2 className="text-2xl font-bold text-pi-dark mb-4">लेटेस्ट <span className="text-pi-main">Barter</span> लिस्टिंग (पंजीकृत वस्तुएं)</h2>
+                        <section className="mb-10 bg-white rounded-2xl p-6 shadow-2xl">
+                            <h2 className="text-3xl font-bold text-pi-dark mb-6 border-b pb-3">लेटेस्ट <span className="text-pi-main">Barter</span> लिस्टिंग</h2>
                             
                             {/* Search Bar */}
-                            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                            <div className="flex flex-col sm:flex-row gap-4 mb-8">
                                 <div className="relative flex-grow">
                                     <input 
                                         type="text" 
-                                        placeholder="आइटम या कीवर्ड्स खोजें..." 
+                                        placeholder="आइटम, कीमत या विवरण खोजें..." 
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main pl-10 transition"
+                                        className="w-full p-4 border border-gray-300 rounded-xl focus:ring-pi-main focus:border-pi-main pl-12 transition shadow-inner"
                                     />
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                                 </div>
                             </div>
                             
-                            {loading && <p className="text-center text-gray-500 my-6 text-lg">लिस्टिंग लोड हो रही है...</p>}
+                            {/* Loading & Status Message */}
+                            {loading && <p className="text-center text-pi-blue my-10 text-xl font-medium">✨ लिस्टिंग लोड हो रही है...</p>}
+                            {!isFirebaseAvailable && !loading && (
+                                <p className="text-center text-red-500 my-10 text-xl font-medium">❌ डेटाबेस कनेक्शन विफल। Firebase कॉन्फिग की जाँच करें।</p>
+                            )}
 
-                            {!isFirebaseAvailable && <p className="text-center text-red-500 my-6 text-lg">Firebase उपलब्ध नहीं है। लिस्टिंग नहीं दिखेंगी।</p>}
-
-                            <div id="listings-container" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                            {/* Listings Grid */}
+                            <div id="listings-container" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                 {!loading && filteredListings.length === 0 && isFirebaseAvailable && (
-                                    <p className="text-center text-gray-500 my-6 text-lg col-span-full">कोई लिस्टिंग नहीं मिली।</p>
+                                    <p className="text-center text-gray-500 my-10 text-xl col-span-full">कोई लिस्टिंग नहीं मिली।</p>
                                 )}
                                 {filteredListings.map(listing => (
-                                    <div key={listing.id} className="bg-white p-4 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition transform hover:scale-[1.01]">
-                                        <h3 className="text-xl font-semibold text-pi-dark truncate">{listing.name}</h3>
-                                        <p className="text-sm text-gray-500 mt-1 mb-3">
-                                            ID: {user && listing.userId === user.uid ? 'आपकी' : listing.userId?.substring(0, 8) || 'Unknown'} | 
-                                            {(listing.date?.toDate ? listing.date.toDate().toLocaleDateString('hi-IN') : 'Loading...')}
-                                        </p>
-                                        <p className="text-gray-700 h-12 overflow-hidden text-ellipsis">{listing.description}</p>
-                                        <div className="mt-4 flex justify-between items-center border-t pt-3">
-                                            <span className="text-2xl font-bold text-pi-main">{listing.price} <span className="text-base font-normal text-gray-600">π</span></span>
-                                            <button 
-                                                onClick={() => showMessage(`बार्टर फ़ंक्शनलिटी अभी उपलब्ध नहीं है।`, 'error')} 
-                                                className="bg-pi-blue text-white text-sm font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition shadow-md"
-                                            >
-                                                बार्टर करें
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <ListingCard 
+                                        key={listing.id} 
+                                        listing={listing} 
+                                        user={user} 
+                                        onBarterClick={handleBarterClick}
+                                    />
                                 ))}
                             </div>
                         </section>
 
                         {/* Post New Barter Section */}
-                        <section className="mb-10 bg-white rounded-xl p-6 shadow-lg">
-                            <h2 className="text-2xl font-bold text-pi-dark mb-4">एक नई <span className="text-pi-main">Barter</span> पोस्ट करें (नई वस्तु)</h2>
-                            <p className="text-gray-600 mb-4">
-                                पोस्ट करने के लिए लॉग इन होना सुनिश्चित करें। आपका ID: <span className="font-semibold text-pi-dark">{user?.uid || 'अतिथि'}</span>
+                        <section className="mb-10 bg-white rounded-2xl p-6 shadow-2xl">
+                            <h2 className="text-3xl font-bold text-pi-dark mb-4 border-b pb-3">एक नई <span className="text-pi-main">Barter</span> पोस्ट करें</h2>
+                            <p className="text-gray-600 mb-6 text-sm">
+                                वर्तमान उपयोगकर्ता ID: <span className="font-mono text-pi-dark font-semibold break-all">{userIdDisplay}</span>
                             </p>
 
                             <button 
@@ -388,21 +501,21 @@
                                     'bg-gray-300 text-gray-600 cursor-not-allowed'
                                 }`}
                             >
-                                + नई लिस्टिंग
+                                <Send size={20} className="inline-block mr-2" /> + नई लिस्टिंग पोस्ट करें
                             </button>
-                            {user && user.isAnonymous && <p className="text-sm text-red-500 mt-2">पोस्ट करने के लिए Pi से साइन इन करें।</p>}
-                            {!isFirebaseAvailable && <p className="text-sm text-red-500 mt-2">Firebase उपलब्ध नहीं है। पोस्टिंग अक्षम है।</p>}
+                            {(user && user.isAnonymous) && <p className="text-sm text-red-500 mt-3">पोस्ट करने के लिए Pi से साइन इन करें।</p>}
+                            {!isFirebaseAvailable && <p className="text-sm text-red-500 mt-3">Firebase उपलब्ध नहीं है। पोस्टिंग अक्षम है।</p>}
                         </section>
 
                         {/* Pi Wallet & Orders Section */}
-                        <section className="bg-white rounded-xl p-6 shadow-lg">
-                            <h2 className="text-2xl font-bold text-pi-dark mb-4">Pi Wallet & Orders (ऑर्डर इतिहास)</h2>
-                            <p className="text-gray-600 mb-4">यह खंड Pi Wallet SDK से जुड़ेगा।</p>
+                        <section className="bg-white rounded-2xl p-6 shadow-2xl">
+                            <h2 className="text-3xl font-bold text-pi-dark mb-4 border-b pb-3">Pi Wallet & ऑर्डर्स</h2>
+                            <p className="text-gray-600 mb-6">यह खंड Pi Wallet SDK के साथ वास्तविक भुगतान इतिहास दिखाएगा।</p>
                             <button 
-                                onClick={() => showMessage('Pi पेमेंट फ़ंक्शनलिटी यहाँ एकीकृत होगी।', 'success')} 
+                                onClick={() => showMessage('Pi Wallet SDK से ऑर्डर फ़ेच करना यहाँ एकीकृत होगा।', 'success')} 
                                 className="bg-pi-blue text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-600 transition shadow-md"
                             >
-                                ऑर्डर देखें (भुगतान)
+                                <ShoppingCart size={20} className="inline-block mr-2" /> ऑर्डर इतिहास देखें
                             </button>
                         </section>
 
@@ -412,7 +525,8 @@
                     <NewListingModal 
                         isModalOpen={isModalOpen} 
                         setIsModalOpen={setIsModalOpen} 
-                        submitNewListing={submitNewListing} 
+                        onSubmit={submitNewListing} 
+                        user={user}
                     />
 
                     {/* Message Box */}
@@ -426,7 +540,8 @@
             );
         };
 
-        // Render the App
+        // --- Render the App ---
+        // Use createRoot for React 18
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
