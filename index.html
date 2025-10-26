@@ -52,8 +52,12 @@
                         <h2 class="text-4xl font-extrabold">12,456.78 <span class="text-yellow-400">Pi</span></h2>
                     </div>
                     <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
-                         <button class="bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg shadow-lg hover:bg-indigo-600 transition text-sm" onclick="processTestTransaction()">
-                            <span role="img" aria-label="Pay">💲</span> टेस्ट Pi ट्रांजेक्शन
+                         <button 
+                            class="bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition text-sm opacity-50" 
+                            id="test-pi-button" 
+                            disabled 
+                            onclick="processTestTransaction()">
+                            <span role="img" aria-label="Pay">⏳</span> SDK Loading...
                         </button>
                         <button class="bg-yellow-500 text-gray-900 font-bold py-2 px-4 rounded-lg shadow-lg hover:bg-yellow-400 transition text-sm" onclick="alert('Pi Wallet Authentication Initiated')">
                             <span role="img" aria-label="Wallet">👛</span> Pi Wallet
@@ -251,11 +255,24 @@
             { id: 'o2', item: 'Laptop Repair', price: 35, status: 'Delivered', escrow: 'Released', type: 'sell' },
         ];
 
+        // --- PI SDK READY CHECK ---
+        function checkPiReady() {
+            var piButton = document.getElementById('test-pi-button');
+            if (typeof Pi !== 'undefined') {
+                // SDK is found, enable the button
+                piButton.removeAttribute('disabled');
+                piButton.innerText = '💲 टेस्ट Pi ट्रांजेक्शन'; 
+                piButton.className = piButton.className.replace('opacity-50', '');
+            } else {
+                // Not ready yet, retry after 500ms
+                setTimeout(checkPiReady, 500); 
+            }
+        }
+        
         // --- PI SDK TRANSACTION LOGIC ---
         function processTestTransaction() {
-            // Check if Pi SDK is available (must be running in Pi Browser)
             if (typeof Pi === 'undefined') {
-                alert("FAILURE: Pi SDK not found. Please open the app in the Pi Browser.");
+                alert("FAILURE: Pi SDK not found. Please ensure the app is fully reloaded in the Pi Browser.");
                 return;
             }
 
@@ -274,7 +291,6 @@
                     // Callback when transaction is approved by the user
                     onReadyForServerApproval: function(paymentId) {
                         alert("SUCCESS: Transaction Ready for Server Approval! CHECKLIST CLEARED.");
-                        // The Pi Network developer portal will detect this state.
                     },
                     // Callback if the transaction is cancelled by the user
                     onCancel: function(paymentId) {
@@ -385,7 +401,7 @@
             }
 
             for (var i = 0; i < filteredListings.length; i++) {
-                var listing = filteredListings[i];
+                var listing = DUMMY_LISTINGS[i];
                 var statusClass = listing.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
                 
                 var itemImageText = listing.itemName.replace(/ /g, '+');
@@ -442,6 +458,7 @@
         window.onload = function() {
             setupNavigation();
             renderListings(); // Load listings on Home page
+            checkPiReady(); // START THE PI CHECK
         };
     </script>
 
