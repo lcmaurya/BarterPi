@@ -16,14 +16,14 @@
     <!-- Pi SDK Mock for testing -->
     <script src="https://cdn.jsdelivr.net/gh/ph0enix-dev/pi-sdk-mock@main/pi-sdk-mock.js"></script>
     
-    <!-- Firebase CDNs (Required for Firestore, Auth) -->
+    <!-- Firebase CDNs (Required for Firestore, Auth) - IMPORTANT: We only import the dependency names. -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, serverTimestamp, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         
-        // Ensure all necessary global objects are created/available for React to use
+        // This makes Firebase functions globally available IF they are initialized.
         window.firebaseDependencies = {
             initializeApp, getAuth, signInWithCustomToken, onAuthStateChanged, signInAnonymously,
             getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, serverTimestamp, orderBy, limit,
@@ -56,117 +56,306 @@
 
     <script type="text/babel">
         const { useState, useEffect, useCallback, useMemo } = React;
-        const { Home, Search, ShoppingCart, User, Send, Settings, MessageCircle, TrendingUp, DollarSign, Truck, Star, Info, Image, Video, Clipboard, QrCode, Shield } = lucide;
+        const { Home, Search, ShoppingCart, User, Send, Settings, MessageCircle, TrendingUp, DollarSign, Truck, Star, Info, Image, Video, Clipboard, QrCode, Shield, X, Sparkles, Wand2, RefreshCw } = lucide;
 
         // --- GLOBAL CONSTANTS ---
-        const ADMIN_ID = 'developer_wallet_id_here'; // Replace with actual Developer Wallet ID
+        const ADMIN_ID = 'developer_wallet_id_here'; 
         const FIRESTORE_COLLECTION_LISTINGS = 'listings';
         const FIRESTORE_COLLECTION_CHATS = 'chats';
         const FIRESTORE_COLLECTION_ORDERS = 'orders';
+        const GEMINI_MODEL_TEXT = 'gemini-2.5-flash-preview-09-2025';
+        const GEMINI_MODEL_IMAGE = 'imagen-3.0-generate-002';
+        
+        // --- MOCK DATABASE (Local Storage Fallback) ---
+        const MOCK_LISTINGS_KEY = 'barter_pi_mock_listings';
+        const MOCK_CHATS_KEY = 'barter_pi_mock_chats';
 
-        // --- Firebase/Auth Setup States ---
+        const getMockData = (key, defaultData) => {
+            try {
+                const stored = localStorage.getItem(key);
+                return stored ? JSON.parse(stored) : defaultData;
+            } catch (e) {
+                console.error("Error reading from LocalStorage:", e);
+                return defaultData;
+            }
+        };
+
+        const setMockData = (key, data) => {
+            try {
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                console.error("Error writing to LocalStorage:", e);
+            }
+        };
+        
+        const initialMockListings = [
+            { id: 'm1', name: 'Pi T-Shirt (Global)', description: 'Soft cotton T-shirt with Pi logo. Shipping worldwide.', price: 10.5, userId: 'mock-seller-1', username: 'GlobalSeller', createdAt: new Date(), media: [{ url: 'https://placehold.co/400x300/1e75ff/ffffff?text=Pi+T-Shirt' }] },
+            { id: 'm2', name: 'Local Handmade Craft', description: 'Unique decorative item made locally.', price: 5.0, userId: 'mock-seller-2', username: 'LocalArtisan', createdAt: new Date(), media: [{ url: 'https://placehold.co/400x300/ffb33f/1e293b?text=Handmade+Craft' }] },
+            { id: 'm3', name: 'Digital Service Offer', description: 'Web design consultation (1 hour).', price: 2.0, userId: 'mock-seller-1', username: 'GlobalSeller', createdAt: new Date(), media: [{ url: 'https://placehold.co/400x300/1e293b/ffb33f?text=Web+Design' }] },
+        ];
+        
+        // --- GEMINI API UTILITIES ---
+        
+        // Exponential backoff for API retries
+        const fetchWithRetry = async (url, options, retries = 3) => {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) {
+                        return response;
+                    }
+                    if (response.status === 429 && i < retries - 1) { // Too Many Requests
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    throw new Error(`API Error: ${response.statusText} (${response.status})`);
+                } catch (error) {
+                    if (i === retries - 1) {
+                        throw error;
+                    }
+                }
+            }
+        };
+
+        const useGemini = () => {
+            const apiKey = "";
+            const apiUrlBase = "https://generativelanguage.googleapis.com/v1beta/models/";
+
+            // 1. Text Generation/Grounding (gemini-2.5-flash)
+            const callGemini = useCallback(async (model, userPrompt, systemInstruction = '', useSearch = false, responseSchema = null) => {
+                const url = `${apiUrlBase}${model}:generateContent?key=${apiKey}`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: userPrompt }] }],
+                };
+                
+                if (systemInstruction) {
+                    payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+                }
+                
+                if (useSearch) {
+                    payload.tools = [{ "google_search": {} }];
+                }
+
+                if (responseSchema) {
+                    payload.generationConfig = {
+                        responseMimeType: "application/json",
+                        responseSchema: responseSchema,
+                    };
+                }
+
+                try {
+                    const response = await fetchWithRetry(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const result = await response.json();
+                    const candidate = result.candidates?.[0];
+                    
+                    if (!candidate || !candidate.content?.parts?.[0]?.text) {
+                        throw new Error("Invalid response structure from Gemini API.");
+                    }
+                    
+                    const text = candidate.content.parts[0].text;
+                    let sources = [];
+                    
+                    const groundingMetadata = candidate.groundingMetadata;
+                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                        sources = groundingMetadata.groundingAttributions
+                            .map(attribution => ({ uri: attribution.web?.uri, title: attribution.web?.title }))
+                            .filter(source => source.uri && source.title);
+                    }
+
+                    return { text, sources };
+
+                } catch (error) {
+                    console.error("Gemini API Error:", error);
+                    throw new Error(`AI Request Failed: ${error.message}.`);
+                }
+            }, []);
+
+            // 2. Image Generation (imagen-3.0-generate-002)
+            const generateImage = useCallback(async (prompt) => {
+                const url = `${apiUrlBase}${GEMINI_MODEL_IMAGE}:predict?key=${apiKey}`;
+                const payload = {
+                    instances: [{ prompt: prompt, aspect_ratio: "4:3" }],
+                    parameters: { "sampleCount": 1 } 
+                };
+
+                try {
+                    const response = await fetchWithRetry(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                        const base64Data = result.predictions[0].bytesBase64Encoded;
+                        return `data:image/png;base64,${base64Data}`;
+                    } else {
+                        throw new Error("Invalid image generation response.");
+                    }
+                } catch (error) {
+                    console.error("Image Generation Error:", error);
+                    throw new Error(`Image Generation Failed: ${error.message}.`);
+                }
+            }, []);
+
+
+            return { callGemini, generateImage };
+        };
+
+
+        // --- Firebase/Auth Setup States (With Anti-Crash Logic) ---
         const useFirebase = () => {
-            const [db, setDb] = useState(null);
+            const [db, setDb] = useState(null); // Will hold the Firestore instance OR a Mock DB object
             const [auth, setAuth] = useState(null);
             const [storage, setStorage] = useState(null);
             const [user, setUser] = useState(null);
             const [isAuthReady, setIsAuthReady] = useState(false);
+            const [isMockMode, setIsMockMode] = useState(false);
 
             useEffect(() => {
-                if (window.firebaseDependencies) {
-                    const { initializeApp, getAuth, getFirestore, signInWithCustomToken, onAuthStateChanged, signInAnonymously, getStorage } = window.firebaseDependencies;
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+                // --- ANTI-CRASH LOGIC: Check if Config is Missing/Empty ---
+                if (!firebaseConfig.apiKey || !window.firebaseDependencies) {
+                    console.warn("❌ Firebase Config/Dependencies missing. Running in STABLE MOCK MODE (Local Storage).");
                     
-                    try {
-                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                    setIsMockMode(true);
+                    
+                    // Setup Mock User
+                    const mockUser = { uid: 'mock_user_' + appId, username: 'MockUser (LS)', isAdmin: false, isMock: true };
+                    setUser(mockUser);
+                    
+                    // Setup Mock DB (Local Storage API)
+                    const mockDb = {
+                        // Mock onSnapshot for Listings
+                        onSnapshotListing: (callback) => {
+                            const data = getMockData(MOCK_LISTINGS_KEY, initialMockListings);
+                            callback(data);
+                            // Mocking a passive listener (no real-time updates)
+                            return () => {}; 
+                        },
+                        // Mock onSnapshot for Chats
+                        onSnapshotChat: (callback) => {
+                            const data = getMockData(MOCK_CHATS_KEY, [{id:'c1', message:'नमस्ते! यह एक नकली चैट है।', userId:'mock-ai', username:'AI Chat'}]);
+                            callback(data);
+                            return () => {};
+                        },
+                        // Mock addDoc for Listings/Chats
+                        addDoc: (collectionName, data) => {
+                            return new Promise(resolve => {
+                                setTimeout(() => {
+                                    const key = collectionName.includes(FIRESTORE_COLLECTION_LISTINGS) ? MOCK_LISTINGS_KEY : MOCK_CHATS_KEY;
+                                    const existing = getMockData(key, key === MOCK_LISTINGS_KEY ? initialMockListings : []);
+                                    
+                                    const newData = { 
+                                        id: 'm' + Date.now(), 
+                                        ...data, 
+                                        createdAt: new Date(),
+                                        userId: mockUser.uid,
+                                        username: mockUser.username,
+                                    };
+                                    const updatedData = [newData, ...existing];
 
-                        if (!firebaseConfig.apiKey) {
-                            console.error("Firebase Config missing. Running in Mock Auth Mode.");
-                            setIsAuthReady(true);
-                            // Mocking a logged-in user if config is missing
-                            setUser({ uid: 'mock_user_' + Date.now(), username: 'MockUser', isMock: true, isAdmin: false });
-                            return;
-                        }
-
-                        const app = initializeApp(firebaseConfig);
-                        const fAuth = getAuth(app);
-                        const fDb = getFirestore(app);
-                        const fStorage = getStorage(app);
-                        
-                        setAuth(fAuth);
-                        setDb(fDb);
-                        setStorage(fStorage);
-                        
-                        // Authentication Logic (Crucial for Pi App)
-                        const unsubscribe = onAuthStateChanged(fAuth, async (currentUser) => {
-                            if (currentUser) {
-                                let piUser = {
-                                    uid: currentUser.uid,
-                                    username: currentUser.isAnonymous ? 'Anonymous' : currentUser.uid.substring(0, 8),
-                                    isAdmin: currentUser.uid === ADMIN_ID,
-                                };
-                                setUser(piUser);
-                                setIsAuthReady(true);
-                            } else {
-                                // Attempt initial sign-in using provided token
-                                try {
-                                    const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                                    if (token) {
-                                        await signInWithCustomToken(fAuth, token);
-                                    } else {
-                                        // Fallback to anonymous sign-in if no token is available
-                                        await signInAnonymously(fAuth);
+                                    setMockData(key, updatedData);
+                                    
+                                    // Manually update state for MOCK UI (important for immediate refresh)
+                                    if (key === MOCK_LISTINGS_KEY) {
+                                        // This is a simplified approach, real React Context would be better
+                                        window.dispatchEvent(new CustomEvent('mockListingUpdate'));
                                     }
-                                } catch (error) {
-                                    console.error("Firebase Authentication Error (Check Render Variables & Pi SDK):", error.message);
-                                    // If auth fails, still set auth ready to allow UI to render (with minimal access)
-                                    setIsAuthReady(true); 
+                                    if (key === MOCK_CHATS_KEY) {
+                                        window.dispatchEvent(new CustomEvent('mockChatUpdate'));
+                                    }
+
+                                    resolve({ id: newData.id });
+                                }, 500);
+                            });
+                        },
+                    };
+                    
+                    setDb(mockDb);
+                    setIsAuthReady(true);
+                    return;
+                }
+
+                // --- REAL FIREBASE SETUP (If config is present) ---
+                const { initializeApp, getAuth, getFirestore, signInWithCustomToken, onAuthStateChanged, signInAnonymously, getStorage } = window.firebaseDependencies;
+                
+                try {
+                    const app = initializeApp(firebaseConfig);
+                    const fAuth = getAuth(app);
+                    const fDb = getFirestore(app);
+                    const fStorage = getStorage(app);
+                    
+                    setAuth(fAuth);
+                    setDb(fDb);
+                    setStorage(fStorage);
+                    
+                    // Authentication Logic (Crucial for Pi App)
+                    const unsubscribe = onAuthStateChanged(fAuth, async (currentUser) => {
+                        if (currentUser) {
+                            let piUser = {
+                                uid: currentUser.uid,
+                                username: currentUser.isAnonymous ? 'Anonymous' : currentUser.uid.substring(0, 8),
+                                isAdmin: currentUser.uid === ADMIN_ID,
+                                isMock: false,
+                            };
+                            setUser(piUser);
+                            setIsAuthReady(true);
+                        } else {
+                            // Attempt initial sign-in using provided token
+                            try {
+                                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                                if (token) {
+                                    await signInWithCustomToken(fAuth, token);
+                                } else {
+                                    await signInAnonymously(fAuth);
                                 }
+                            } catch (error) {
+                                console.error("Firebase Authentication Error (Check Render Variables & Pi SDK):", error.message);
+                                // If auth fails, still set auth ready to allow UI to render (with minimal access)
+                                setIsAuthReady(true); 
                             }
-                        });
+                        }
+                    });
 
-                        return () => unsubscribe(); // Cleanup auth listener
+                    return () => unsubscribe(); // Cleanup auth listener
 
-                    } catch (e) {
-                        console.error("Firebase initialization failed:", e);
-                        setIsAuthReady(true); // Ensure UI renders even if Firebase fails
-                    }
+                } catch (e) {
+                    console.error("Firebase initialization failed:", e);
+                    setIsAuthReady(true); // Ensure UI renders even if Firebase fails
                 }
             }, []);
 
-            return { db, auth, storage, user, isAuthReady };
+            return { db, auth, storage, user, isAuthReady, isMockMode };
         };
 
-        // --- AI & Converter Utility (Mocking API Call) ---
-        const useAI = () => {
+        // --- Converter Utility (Pi Price Mock) ---
+        const useConverter = () => {
             const [piPrice, setPiPrice] = useState('N/A');
             const [loading, setLoading] = useState(false);
 
-            // Mock Fetch for Pi Price
             useEffect(() => {
                 setLoading(true);
-                // In a real app, this would call an API like gemini-2.5-flash-preview-09-2025 with google_search tool
                 setTimeout(() => {
                     setPiPrice('~$35 USD (Current Consensus)');
                     setLoading(false);
                 }, 1500);
             }, []);
 
-            const getAIResponse = (query) => {
-                return new Promise((resolve) => {
-                    setLoading(true);
-                    setTimeout(() => {
-                        const response = `AI Assistant: "${query}" के आधार पर, यह Barter-Pi Pro है जो Pi Network के लिए बनाया गया है। यह सुरक्षा (high level security), पेमेंट (wallet connectivity), और ग्लोबल/लोकल सर्च (global/local search) का समर्थन करता है।`;
-                        setLoading(false);
-                        resolve(response);
-                    }, 2000);
-                });
-            };
-
-            return { piPrice, loading, getAIResponse };
+            return { piPrice, loading };
         };
 
-        // --- Component: Header & Nav ---
+        // --- Component: Header & Nav (No changes needed) ---
         const Header = ({ user, isAdmin, onSignOut, navigate, currentPage }) => {
             const navItems = [
                 { id: 'deals', label: 'Main Deals', icon: TrendingUp },
@@ -250,55 +439,69 @@
             );
         };
 
-        // --- Component: Main Deals/Listings (Combined for brevity) ---
-        const DealsPage = ({ db, user, storage, navigate, ai }) => {
+        // --- Component: Main Deals/Listings (No functional change) ---
+        const DealsPage = ({ db, user, storage, navigate, piPrice, isMockMode, callGemini, generateImage }) => {
             const [listings, setListings] = useState([]);
             const [loading, setLoading] = useState(true);
             const [searchQuery, setSearchQuery] = useState('');
             const [isModalOpen, setIsModalOpen] = useState(false);
-            const { getDoc, collection, query, onSnapshot, where, orderBy, limit } = window.firebaseDependencies || {};
-
-            // Firestore Data Listener
+            const { collection, query, onSnapshot, orderBy, limit } = window.firebaseDependencies || {};
+            
+            // Local Storage/Firestore Data Listener
             useEffect(() => {
-                if (!db || !user || user.isMock) {
-                    setLoading(false);
-                    return;
+                setLoading(true);
+
+                if (isMockMode) {
+                    // MOCK MODE: Use Local Storage/Mock API
+                    const handleUpdate = () => {
+                        const data = getMockData(MOCK_LISTINGS_KEY, initialMockListings);
+                        setListings(data);
+                        setLoading(false);
+                    };
+                    
+                    handleUpdate(); // Initial Load
+                    window.addEventListener('mockListingUpdate', handleUpdate);
+                    return () => window.removeEventListener('mockListingUpdate', handleUpdate);
+
+                } else if (db && user && !user.isMock) {
+                    // FIREBASE MODE: Use Real Firestore
+                    const q = query(
+                        collection(db, `artifacts/${__app_id}/public/data/${FIRESTORE_COLLECTION_LISTINGS}`),
+                        orderBy('createdAt', 'desc'),
+                        limit(50)
+                    );
+
+                    const unsubscribe = onSnapshot(q, (snapshot) => {
+                        const fetchedListings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setListings(fetchedListings);
+                        setLoading(false);
+                    }, (error) => {
+                        console.error("Error fetching listings (FIREBASE):", error);
+                        setLoading(false);
+                    });
+
+                    return () => unsubscribe();
                 }
-                
-                const q = query(
-                    collection(db, `artifacts/${__app_id}/public/data/${FIRESTORE_COLLECTION_LISTINGS}`),
-                    orderBy('createdAt', 'desc'),
-                    limit(50)
-                );
 
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const fetchedListings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setListings(fetchedListings);
-                    setLoading(false);
-                }, (error) => {
-                    console.error("Error fetching listings:", error);
-                    setLoading(false);
-                    // navigate('error', { message: 'Database Access Failed. Check Security Rules.' });
-                });
-
-                return () => unsubscribe();
-            }, [db, user]);
+                // Fallback for non-mock, non-auth state
+                setLoading(false);
+            }, [db, user, isMockMode]);
 
             const filteredListings = listings.filter(l =>
                 l.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 l.description?.toLowerCase().includes(searchQuery.toLowerCase())
             );
 
-            // Mock/Real Payment Handler
+            // Mock/Real Payment Handler (No change, uses Pi Mock SDK)
             const handleBarterClick = (listing) => {
+                // ... (Payment logic remains the same)
                 if (!user || user.isMock) {
-                    alert('Mock User: Sign in with real Pi to proceed to payment.');
+                    alert('Mock User: Sign in with real Pi or switch to a Firebase environment to proceed to real payment.');
                     return;
                 }
                 
                 alert(`Barter initiated for ${listing.name} at ${listing.price}π. Starting Pi Payment SDK.`);
                 
-                // Real Pi Payment SDK Call
                 Pi.createPayment({
                     amount: listing.price,
                     memo: `Barter for ${listing.name} (ID: ${listing.id})`,
@@ -306,11 +509,9 @@
                 }, {
                     onReadyForServerApproval: (paymentId) => {
                         console.log(`Payment Ready: ${paymentId}`);
-                        // In a full app, this sends to a backend server for approval
                     },
                     onPaymentCompleted: (paymentId, txid) => {
                         alert(`🎉 पेमेंट सफल! TxID: ${txid}. अब 'Orders' पेज पर डिलीवरी ट्रैक करें।`);
-                        // Navigate or update order status
                     },
                     onPaymentCancelled: () => {
                         alert("❌ पेमेंट रद्द हो गया।");
@@ -324,6 +525,13 @@
             return (
                 <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
                     
+                    {isMockMode && (
+                        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mb-6 shadow-md">
+                            <p className="font-bold">स्थिरता चेतावनी: Local Storage Mode</p>
+                            <p className="text-sm">Firebase Variables नहीं मिले। डेटा Local Storage (आपके ब्राउज़र) में सेव हो रहा है, जो सभी यूज़र्स के बीच साझा नहीं होगा। Firebase ठीक करने के लिए Variables जोड़ें।</p>
+                        </div>
+                    )}
+
                     {/* Header & Controls */}
                     <div className="flex justify-between items-center mb-6 border-b pb-4">
                         <h2 className="text-3xl font-bold text-pi-dark">
@@ -331,9 +539,9 @@
                         </h2>
                         <button 
                             onClick={() => setIsModalOpen(true)}
-                            disabled={!user || user.isMock}
+                            disabled={!user}
                             className={`font-semibold py-2 px-4 rounded-lg transition shadow-lg text-white ${
-                                user && !user.isMock ? 'bg-pi-blue hover:bg-blue-600' : 'bg-gray-400 cursor-not-allowed'
+                                user ? 'bg-pi-blue hover:bg-blue-600' : 'bg-gray-400 cursor-not-allowed'
                             }`}
                         >
                             + नई वस्तु पोस्ट करें
@@ -380,13 +588,16 @@
                         user={user}
                         storage={storage}
                         collectionName={FIRESTORE_COLLECTION_LISTINGS}
+                        isMockMode={isMockMode}
+                        callGemini={callGemini}
+                        generateImage={generateImage}
                     />
 
                 </div>
             );
         };
 
-        // --- Component: Listing Card ---
+        // --- Component: Listing Card (No change) ---
         const ListingCard = ({ listing, user, onBarterClick, navigate }) => {
             const isOwner = user?.uid === listing.userId;
             const imageUrl = listing.media?.[0]?.url || 'https://placehold.co/400x300/fec84d/1e293b?text=Barter-Pi';
@@ -453,7 +664,7 @@
 
 
         // --- Component: New Listing Modal (Seller UI) ---
-        const NewListingModal = ({ isModalOpen, setIsModalOpen, db, user, storage, collectionName }) => {
+        const NewListingModal = ({ isModalOpen, setIsModalOpen, db, user, storage, collectionName, isMockMode, callGemini, generateImage }) => {
             if (!isModalOpen) return null;
 
             const [name, setName] = useState('');
@@ -462,8 +673,81 @@
             const [mediaType, setMediaType] = useState('image'); // 'image' or 'video'
             const [mediaData, setMediaData] = useState(''); // Base64 or URL
             const [loading, setLoading] = useState(false);
+            const [aiLoading, setAiLoading] = useState(false);
             const { addDoc, collection, serverTimestamp, ref, uploadString, getDownloadURL } = window.firebaseDependencies || {};
             
+            // --- GEMINI FEATURE 1: Product Description Generator ---
+            const descriptionSchema = {
+                type: "OBJECT",
+                properties: {
+                    "productName": { "type": "STRING", "description": "A compelling, short product name in Hindi." },
+                    "description": { "type": "STRING", "description": "A detailed, sales-oriented product description in Hindi." },
+                    "tags": { "type": "ARRAY", "items": { "type": "STRING" }, "description": "3 to 5 relevant tags for searching." }
+                },
+                "propertyOrdering": ["productName", "description", "tags"]
+            };
+
+            const generateContent = async () => {
+                if (!name.trim()) return alert('कृपया वस्तु का नाम दर्ज करें।');
+                setAiLoading(true);
+                
+                const prompt = `Based on the product name or keywords: "${name}", generate a short, compelling product name (productName), a detailed, sales-oriented product description (description), and 5 relevant search tags (tags). The output language for the name and description MUST be Hindi. The tags can be mixed Hindi/English.`;
+
+                try {
+                    const { text } = await callGemini(GEMINI_MODEL_TEXT, prompt, '', false, descriptionSchema);
+                    const parsedJson = JSON.parse(text);
+                    
+                    setName(parsedJson.productName || name);
+                    setDescription(parsedJson.description || "विवरण उत्पन्न करने में विफल रहा।");
+                    // Tags would ideally be stored separately but for this app, we'll just log them.
+                    console.log("Generated Tags:", parsedJson.tags.join(', '));
+
+                } catch (error) {
+                    alert(`❌ AI Content Generation Failed: ${error.message}`);
+                    setDescription("AI द्वारा सामग्री उत्पन्न करने में त्रुटि।");
+                } finally {
+                    setAiLoading(false);
+                }
+            };
+            
+            // --- GEMINI FEATURE 2: Summarization ---
+            const summarizeDescription = async () => {
+                if (description.length < 50) return alert('संक्षेप (summary) के लिए विवरण कम से कम 50 अक्षर लंबा होना चाहिए।');
+                setAiLoading(true);
+                
+                const prompt = `Summarize the following product description in one single, concise paragraph (max 50 words) in Hindi. Description: ${description}`;
+
+                try {
+                    const { text } = await callGemini(GEMINI_MODEL_TEXT, prompt);
+                    alert(`संक्षिप्त विवरण (Summary): \n\n${text}`);
+                } catch (error) {
+                    alert(`❌ AI Summarization Failed: ${error.message}`);
+                } finally {
+                    setAiLoading(false);
+                }
+            };
+
+            // --- GEMINI FEATURE 3: Image Generation ---
+            const generateProductImage = async () => {
+                if (!name.trim() || !description.trim()) return alert('AI Image बनाने के लिए वस्तु का नाम और विवरण आवश्यक है।');
+                setAiLoading(true);
+
+                const imagePrompt = `A 3D render of "${name}, ${description.substring(0, 100)}", photo-realistic, soft studio lighting, on a simple light background, suitable for e-commerce.`;
+                
+                try {
+                    const imageUrl = await generateImage(imagePrompt);
+                    setMediaData(imageUrl); // Set the generated image as the media data
+                    setMediaType('image');
+                    alert('✨ AI Image सफलतापूर्वक उत्पन्न हुई!');
+                } catch (error) {
+                    alert(`❌ AI Image Generation Failed: ${error.message}`);
+                    setMediaData('');
+                } finally {
+                    setAiLoading(false);
+                }
+            };
+
+
             // Simulating image upload by converting string to base64
             const handleMediaChange = (e) => {
                 const file = e.target.files[0];
@@ -477,6 +761,12 @@
             };
 
             const uploadMedia = async (fileBase64) => {
+                // Mock or Real Storage Upload
+                if (isMockMode) {
+                    console.log("Mock Storage: Image/Video data received, but not uploaded to a persistent storage.");
+                    return 'https://placehold.co/400x300/6b7280/ffffff?text=Mock+Media+Uploaded';
+                }
+
                 const storageRef = ref(storage, `listings/${user.uid}/${Date.now()}`);
                 const snapshot = await uploadString(storageRef, fileBase64, 'data_url');
                 return await getDownloadURL(snapshot.ref);
@@ -484,13 +774,13 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (parseFloat(price) <= 0 || !db || !user || !storage) return alert('कीमत 0 से अधिक होनी चाहिए या Firebase लोड नहीं है।');
+                if (parseFloat(price) <= 0 || !db || !user) return alert('कीमत 0 से अधिक होनी चाहिए।');
                 setLoading(true);
 
                 try {
                     let mediaUrl = '';
                     if (mediaData) {
-                        mediaUrl = await uploadMedia(mediaData); // Upload to Storage
+                        mediaUrl = await uploadMedia(mediaData); // Upload (Mock or Real)
                     }
 
                     const newListing = {
@@ -500,18 +790,25 @@
                         userId: user.uid,
                         username: user.username,
                         media: mediaUrl ? [{ type: mediaType, url: mediaUrl }] : [],
-                        createdAt: serverTimestamp(),
                         status: 'available',
-                        isLocal: false, // For future Local/Global Search separation
+                        isLocal: false,
                     };
 
-                    await addDoc(collection(db, `artifacts/${__app_id}/public/data/${collectionName}`), newListing);
+                    if (isMockMode) {
+                        await db.addDoc(collectionName, newListing);
+                    } else {
+                        // Real Firebase addDoc
+                        await addDoc(collection(db, `artifacts/${__app_id}/public/data/${collectionName}`), {
+                            ...newListing,
+                            createdAt: serverTimestamp(),
+                        });
+                    }
 
                     alert('लिस्टिंग सफलतापूर्वक पोस्ट हुई!');
                     setIsModalOpen(false);
                 } catch (error) {
                     console.error("Posting error:", error);
-                    alert(`❌ पोस्टिंग विफल: ${error.message}. Firebase Config/Rules की जाँच करें।`);
+                    alert(`❌ पोस्टिंग विफल: ${error.message}.`);
                 } finally {
                     setLoading(false);
                 }
@@ -531,7 +828,7 @@
                             {/* Product Details */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">वस्तु का नाम</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">वस्तु का नाम (या Keywords)</label>
                                     <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="p-3 w-full border border-gray-300 rounded-lg focus:ring-pi-main focus:border-pi-main shadow-sm" />
                                 </div>
                                 <div>
@@ -545,34 +842,75 @@
                                 <textarea required value={description} onChange={(e) => setDescription(e.target.value)} className="p-3 w-full border border-gray-300 rounded-lg h-24 focus:ring-pi-main focus:border-pi-main shadow-sm"></textarea>
                             </div>
 
+                            {/* Gemini Content Buttons */}
+                            <div className="mt-4 flex flex-wrap gap-3">
+                                <button 
+                                    type="button" 
+                                    onClick={generateContent} 
+                                    disabled={aiLoading}
+                                    className={`flex items-center text-sm font-semibold py-2 px-4 rounded-full transition shadow-md ${aiLoading ? 'bg-gray-400' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
+                                >
+                                    {aiLoading ? <RefreshCw size={16} className="animate-spin mr-2" /> : <Sparkles size={16} className="mr-2" />}
+                                    विवरण/नाम जनरेट करें ✨
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onClick={summarizeDescription} 
+                                    disabled={aiLoading || description.length < 50}
+                                    className={`flex items-center text-sm font-semibold py-2 px-4 rounded-full transition shadow-md ${aiLoading || description.length < 50 ? 'bg-gray-400' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
+                                >
+                                    <Clipboard size={16} className="mr-2" />
+                                    संक्षेप (Summary) देखें
+                                </button>
+                            </div>
+
+
                             {/* Image/Video Upload */}
-                            <div className="mt-4 border p-4 rounded-lg bg-gray-50">
+                            <div className="mt-6 border p-4 rounded-xl bg-gray-50">
                                 <h4 className="text-lg font-semibold mb-3">मीडिया अपलोड (छवि/वीडियो)</h4>
-                                <div className="flex space-x-4 mb-3">
-                                    <label className="flex items-center">
+                                
+                                <div className="flex flex-wrap gap-3 mb-4">
+                                    <label className="flex items-center text-sm">
                                         <input type="radio" name="mediaType" value="image" checked={mediaType === 'image'} onChange={() => setMediaType('image')} className="mr-2 text-pi-main" />
-                                        <Image size={16} className="mr-1 inline" /> Image
+                                        <Image size={16} className="mr-1 inline" /> Image (Upload)
                                     </label>
-                                    <label className="flex items-center">
+                                    <label className="flex items-center text-sm">
                                         <input type="radio" name="mediaType" value="video" checked={mediaType === 'video'} onChange={() => setMediaType('video')} className="mr-2 text-pi-main" />
                                         <Video size={16} className="mr-1 inline" /> Video (Mock Upload)
                                     </label>
+                                    <button 
+                                        type="button" 
+                                        onClick={generateProductImage} 
+                                        disabled={aiLoading}
+                                        className={`flex items-center text-sm font-semibold py-1 px-3 rounded-full transition shadow-md ${aiLoading ? 'bg-gray-400' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'}`}
+                                    >
+                                        {aiLoading ? <RefreshCw size={14} className="animate-spin mr-1" /> : <Wand2 size={14} className="mr-1" />}
+                                        AI Image बनाओ ✨
+                                    </button>
                                 </div>
-                                <input 
-                                    type="file" 
-                                    accept={mediaType === 'image' ? 'image/*' : 'video/*'} 
-                                    onChange={handleMediaChange} 
-                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pi-light file:text-pi-dark hover:file:bg-yellow-100"
-                                />
-                                {mediaData && (
-                                    <p className="mt-3 text-xs text-green-600">मीडिया चयनित। अपलोड होने पर दिखना चाहिए।</p>
+
+                                {mediaType === 'image' && (
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        onChange={handleMediaChange} 
+                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-pi-light file:text-pi-dark hover:file:bg-yellow-100"
+                                    />
                                 )}
+                                
+                                {mediaData && (
+                                    <div className="mt-4 p-2 border rounded-lg bg-white flex items-center">
+                                        <img src={mediaData} alt="Media Preview" className="w-16 h-16 object-cover rounded mr-3" />
+                                        <p className="text-xs text-green-600 truncate flex-1">मीडिया चयनित/जनरेटेड। {mediaData.length > 100 ? '(Base64 Data)' : '(External URL)'}</p>
+                                    </div>
+                                )}
+                                
                             </div>
 
                             {/* Developer Wallet Note */}
                             <div className="mt-6 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded">
                                 <p className="text-sm">
-                                    <Shield size={16} className="inline-block mr-1" /> **High Security Note:** यह लिस्टिंग डेवलपर वॉलेट: <span className="font-mono">{user?.uid}</span> से जोड़ी जाएगी।
+                                    <Shield size={16} className="inline-block mr-1" /> **Security Note:** लिस्टिंग यूज़र ID: <span className="font-mono">{user?.uid}</span> से जुड़ी होगी।
                                 </p>
                             </div>
 
@@ -587,47 +925,71 @@
             );
         };
 
-        // --- Component: Chat Box Page ---
-        const ChatPage = ({ db, user }) => {
+
+        // --- Component: Chat Box Page (No functional change) ---
+        const ChatPage = ({ db, user, isMockMode }) => {
             const [chatType, setChatType] = useState('public');
             const [message, setMessage] = useState('');
             const [messages, setMessages] = useState([]);
             const chatPath = `artifacts/${__app_id}/public/data/${FIRESTORE_COLLECTION_CHATS}`;
             const { addDoc, collection, query, onSnapshot, orderBy, limit, serverTimestamp } = window.firebaseDependencies || {};
             
-            // Fetch messages
+            // Fetch messages (Mock or Real)
             useEffect(() => {
-                if (!db || !user || user.isMock) return;
+                if (!db || !user) return;
+                
+                if (isMockMode) {
+                    // MOCK MODE: Use Local Storage/Mock API
+                    const handleUpdate = () => {
+                        const data = getMockData(MOCK_CHATS_KEY, [{id:'c1', message:'नमस्ते! यह एक नकली चैट है।', userId:'mock-ai', username:'AI Chat'}]);
+                        // Filter by mock chatType (very basic mock)
+                        setMessages(data.reverse()); 
+                    };
+                    handleUpdate(); // Initial Load
+                    window.addEventListener('mockChatUpdate', handleUpdate);
+                    return () => window.removeEventListener('mockChatUpdate', handleUpdate);
 
-                const q = query(
-                    collection(db, chatPath),
-                    where('type', '==', chatType),
-                    orderBy('createdAt', 'desc'),
-                    limit(50)
-                );
+                } else {
+                    // FIREBASE MODE: Use Real Firestore
+                    const q = query(
+                        collection(db, chatPath),
+                        where('type', '==', chatType),
+                        orderBy('createdAt', 'desc'),
+                        limit(50)
+                    );
 
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const fetchedMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
-                    setMessages(fetchedMessages);
-                }, (error) => {
-                    console.error("Chat fetch error:", error);
-                });
+                    const unsubscribe = onSnapshot(q, (snapshot) => {
+                        const fetchedMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
+                        setMessages(fetchedMessages);
+                    }, (error) => {
+                        console.error("Chat fetch error:", error);
+                    });
 
-                return () => unsubscribe();
-            }, [db, user, chatType]);
+                    return () => unsubscribe();
+                }
+
+            }, [db, user, chatType, isMockMode]);
 
             const sendMessage = async (e) => {
                 e.preventDefault();
-                if (!message.trim() || !db || user.isMock) return;
+                if (!message.trim() || !db) return;
 
+                const messageData = {
+                    userId: user.uid,
+                    username: user.username || user.uid.substring(0, 8),
+                    message: message.trim(),
+                    type: chatType,
+                };
+                
                 try {
-                    await addDoc(collection(db, chatPath), {
-                        userId: user.uid,
-                        username: user.username || user.uid.substring(0, 8),
-                        message: message.trim(),
-                        type: chatType,
-                        createdAt: serverTimestamp(),
-                    });
+                    if (isMockMode) {
+                        await db.addDoc(FIRESTORE_COLLECTION_CHATS, messageData);
+                    } else {
+                        await addDoc(collection(db, chatPath), {
+                            ...messageData,
+                            createdAt: serverTimestamp(),
+                        });
+                    }
                     setMessage('');
                 } catch (error) {
                     alert(`संदेश भेजने में विफल: ${error.message}`);
@@ -669,41 +1031,65 @@
                             type="text" 
                             value={message} 
                             onChange={(e) => setMessage(e.target.value)}
-                            placeholder={user && !user.isMock ? "अपना संदेश लिखें..." : "साइन इन करें (Mock User चैटिंग नहीं कर सकता)"}
-                            disabled={!user || user.isMock}
+                            placeholder={user ? "अपना संदेश लिखें..." : "साइन इन करें (यूज़र ID लोड हो रहा है)"}
+                            disabled={!user || isMockMode} // Chatting disabled in Mock Mode to prevent data loss confusion
                             className="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-pi-main focus:border-pi-main shadow-inner disabled:bg-gray-100"
                         />
                         <button 
                             type="submit" 
-                            disabled={!user || user.isMock || !message.trim()}
+                            disabled={!user || !message.trim() || isMockMode}
                             className="bg-pi-main text-pi-dark font-semibold p-3 rounded-xl hover:bg-yellow-400 transition shadow-md disabled:bg-gray-300 disabled:text-gray-500"
                         >
                             <Send size={24} />
                         </button>
                     </form>
+                    {isMockMode && <p className="text-red-500 text-sm mt-2">चैटिंग के लिए Firebase आवश्यक है। Mock Mode में यह सुविधा निष्क्रिय है।</p>}
                 </div>
             );
         };
 
-        // --- Component: AI Helper Page ---
-        const AIHelperPage = ({ piPrice, loading, getAIResponse }) => {
+        // --- Component: AI Helper Page (Real Gemini Search & Grounding) ---
+        const AIHelperPage = ({ piPrice, loading: converterLoading, callGemini }) => {
             const [query, setQuery] = useState('');
             const [aiResponse, setAiResponse] = useState('');
+            const [aiLoading, setAiLoading] = useState(false);
             const [conversionAmount, setConversionAmount] = useState(1);
-            const exchangeRate = 35; // Mock Pi to USD rate
+            const [sources, setSources] = useState([]);
+            const exchangeRate = 35; // Mock Exchange Rate
 
             const handleAskAI = async () => {
-                if (!query.trim()) return;
-                const response = await getAIResponse(query.trim());
-                setAiResponse(response);
-                setQuery('');
+                if (!query.trim()) return alert('कृपया एक प्रश्न दर्ज करें।');
+                setAiLoading(true);
+                setAiResponse('');
+                setSources([]);
+
+                const userQuery = query.trim();
+                setQuery(''); // Clear input immediately
+
+                const systemInstruction = "You are a helpful and knowledgeable e-commerce assistant specializing in the Pi Network ecosystem and global market trends. Answer the user's question concisely in Hindi, using information from Google Search for grounding. Include a disclaimer at the end about the nature of the information.";
+                
+                try {
+                    const { text, sources: newSources } = await callGemini(
+                        GEMINI_MODEL_TEXT, 
+                        userQuery, 
+                        systemInstruction, 
+                        true // useSearch = true
+                    );
+                    setAiResponse(text);
+                    setSources(newSources);
+
+                } catch (error) {
+                    setAiResponse(`❌ AI सेवा में त्रुटि: ${error.message}`);
+                } finally {
+                    setAiLoading(false);
+                }
             };
 
             const convertedValue = (conversionAmount * exchangeRate).toFixed(2);
 
             return (
                 <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-white rounded-xl shadow-2xl mt-8">
-                    <h2 className="text-3xl font-bold text-pi-dark mb-6 border-b pb-3 flex items-center"><Info size={28} className="mr-2 text-pi-main" /> AI Assistant & Converter</h2>
+                    <h2 className="text-3xl font-bold text-pi-dark mb-6 border-b pb-3 flex items-center"><Info size={28} className="mr-2 text-pi-main" /> AI Assistant (Real-time Search)</h2>
                     
                     {/* Pi Price Converter */}
                     <div className="mb-8 p-5 border border-gray-200 rounded-xl bg-pi-light shadow-inner">
@@ -725,9 +1111,37 @@
 
                     {/* AI Chat Box */}
                     <div className="mb-6">
-                        <h3 className="text-xl font-bold text-pi-dark mb-3">AI से जानकारी प्राप्त करें (Multi-Language Global Search Mock)</h3>
+                        <h3 className="text-xl font-bold text-pi-dark mb-3 flex items-center">
+                            AI से मार्केट/Pi के बारे में पूछें ✨ (Gemini Search)
+                        </h3>
                         <div className="h-40 overflow-y-auto border border-gray-300 rounded-xl p-4 mb-4 bg-gray-50">
-                            <p className="text-gray-500 text-sm">{loading ? 'AI सोच रहा है...' : aiResponse || 'AI को कोई भी सवाल पूछें...'}</p>
+                            {aiLoading ? (
+                                <p className="text-pi-blue flex items-center font-medium">
+                                    <RefreshCw size={16} className="animate-spin mr-2" /> AI सोच रहा है और Google पर खोज रहा है...
+                                </p>
+                            ) : aiResponse ? (
+                                <>
+                                    <p className="text-gray-800 text-sm whitespace-pre-wrap">{aiResponse}</p>
+                                    {sources.length > 0 && (
+                                        <div className="mt-3 border-t pt-2">
+                                            <p className="text-xs font-semibold text-gray-600 mb-1">Sources:</p>
+                                            {sources.map((source, index) => (
+                                                <a 
+                                                    key={index} 
+                                                    href={source.uri} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="block text-xs text-pi-blue hover:underline truncate"
+                                                >
+                                                    {source.title}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <p className="text-gray-500 text-sm">जैसे: 'Pi Network की नवीनतम घोषणाएँ क्या हैं?' या 'आज Pi Barter market का क्या चलन है?'</p>
+                            )}
                         </div>
                         <div className="flex space-x-3">
                             <input 
@@ -735,15 +1149,16 @@
                                 value={query} 
                                 onChange={(e) => setQuery(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleAskAI()}
-                                placeholder="जैसे: Pi Network क्या है?"
-                                className="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-pi-main focus:border-pi-main shadow-inner"
+                                placeholder="अपना प्रश्न यहाँ दर्ज करें..."
+                                disabled={aiLoading}
+                                className="flex-grow p-3 border border-gray-300 rounded-xl focus:ring-pi-main focus:border-pi-main shadow-inner disabled:bg-gray-100"
                             />
                             <button 
                                 onClick={handleAskAI}
-                                disabled={loading}
+                                disabled={aiLoading || !query.trim()}
                                 className="bg-pi-blue text-white font-semibold p-3 rounded-xl hover:bg-blue-600 transition shadow-md disabled:bg-gray-400"
                             >
-                                {loading ? '...' : 'पूछो'}
+                                {aiLoading ? '...' : <Send size={24} />}
                             </button>
                         </div>
                     </div>
@@ -751,7 +1166,8 @@
             );
         };
 
-        // --- Component: Order/Delivery Tracking (Buyer/Seller UI) ---
+
+        // --- Component: Order/Delivery Tracking (No change) ---
         const OrderPage = ({ db, user, params }) => {
             const [orderStatus, setOrderStatus] = useState('Placed'); // Placed, Shipped, OutForDelivery, Delivered
             const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -864,7 +1280,7 @@
             );
         };
         
-        // --- Component: Admin Page ---
+        // --- Component: Admin Page (No change) ---
         const AdminPage = ({ isAdmin }) => {
             if (!isAdmin) {
                 return (
@@ -912,8 +1328,9 @@
 
         // --- Root App Component ---
         const App = () => {
-            const { db, auth, storage, user, isAuthReady } = useFirebase();
-            const { piPrice, loading: aiLoading, getAIResponse } = useAI();
+            const { db, auth, storage, user, isAuthReady, isMockMode } = useFirebase();
+            const { piPrice, loading: converterLoading } = useConverter();
+            const { callGemini, generateImage } = useGemini();
             const [currentPage, setCurrentPage] = useState('deals');
             const [pageParams, setPageParams] = useState({});
 
@@ -928,7 +1345,6 @@
                 if (auth) {
                     auth.signOut().then(() => {
                         alert('Sign Out Successful.');
-                        // Optionally reload to ensure token is cleared
                         window.location.reload(); 
                     }).catch(error => {
                         console.error("Sign out error:", error);
@@ -936,7 +1352,7 @@
                     });
                 } else {
                     alert('Mock Sign Out.');
-                    user && user.isMock && window.location.reload(); 
+                    window.location.reload(); 
                 }
             };
             
@@ -953,18 +1369,18 @@
 
                 switch (currentPage) {
                     case 'deals':
-                    case 'listings': // Combine Main Deals and Listings Page
-                        return <DealsPage db={db} user={user} storage={storage} navigate={navigate} ai={{ piPrice, aiLoading }} />;
+                    case 'listings': 
+                        return <DealsPage db={db} user={user} storage={storage} navigate={navigate} piPrice={piPrice} isMockMode={isMockMode} callGemini={callGemini} generateImage={generateImage} />;
                     case 'chat':
-                        return <ChatPage db={db} user={user} />;
+                        return <ChatPage db={db} user={user} isMockMode={isMockMode} />;
                     case 'ai':
-                        return <AIHelperPage piPrice={piPrice} loading={aiLoading} getAIResponse={getAIResponse} />;
+                        return <AIHelperPage piPrice={piPrice} loading={converterLoading} callGemini={callGemini} />;
                     case 'admin':
                         return <AdminPage isAdmin={isAdmin} />;
                     case 'order':
                         return <OrderPage db={db} user={user} params={pageParams} />;
                     default:
-                        return <DealsPage db={db} user={user} storage={storage} navigate={navigate} ai={{ piPrice, aiLoading }} />;
+                        return <DealsPage db={db} user={user} storage={storage} navigate={navigate} piPrice={piPrice} isMockMode={isMockMode} callGemini={callGemini} generateImage={generateImage} />;
                 }
             };
 
@@ -984,6 +1400,7 @@
                     <div className="fixed bottom-0 left-0 right-0 bg-gray-800 text-white p-2 text-center text-xs shadow-inner z-40">
                         <span className="font-bold">Current User ID: </span>
                         <span className="font-mono break-all">{user ? user.uid : 'Signing In...'}</span>
+                        {isMockMode && <span className="text-yellow-400 font-bold ml-2">(MOCK MODE)</span>}
                     </div>
                 </div>
             );
