@@ -155,14 +155,14 @@
                     </div>
                     <div class="flex flex-col w-full md:w-2/3 md:pl-3">
                         <h2 class="text-base font-bold text-gray-800 mb-3 border-b pb-1">iPhone 14 Pro (Chat)</h2>
-                         <div class="flex-grow bg-gray-50 p-3 rounded-lg overflow-y-scroll space-y-3 text-sm">
-                            <div class="flex justify-start"><div class="bg-white p-2 rounded-xl rounded-tl-none max-w-xs shadow-md">नमस्ते, 400 Pi ठीक रहेगा?</div></div>
+                         <div class="flex-grow bg-gray-50 p-3 rounded-lg overflow-y-scroll space-y-3 text-sm" id="chat-history-container">
+                            <div class="flex justify-start"><div class="bg-white p-2 rounded-xl rounded-tl-none max-w-xs shadow-md">नमस्ते, क्या 400 Pi ठीक रहेगा?</div></div>
                             <div class="flex justify-end"><div class="text-right"><div class="bg-indigo-100 p-2 rounded-xl rounded-tr-none max-w-xs shadow-md">450 Pi अंतिम मूल्य है।</div></div></div>
                         </div>
-                        <div class="mt-3 flex space-x-2">
-                            <input type="text" placeholder="मैसेज लिखें..." class="flex-grow p-2 border rounded-lg text-sm" />
-                            <button class="bg-indigo-600 text-white p-2 rounded-lg font-semibold text-sm" onclick="handleAIChatSubmit(event)">Send</button>
-                        </div>
+                        <form class="mt-3 flex space-x-2" onsubmit="handleChatSubmit(event)">
+                            <input type="text" placeholder="मैसेज लिखें..." class="flex-grow p-2 border rounded-lg text-sm" id="chat-input"/>
+                            <button type="submit" class="bg-indigo-600 text-white p-2 rounded-lg font-semibold text-sm">Send</button>
+                        </form>
                     </div>
                 </div>
             </section>
@@ -327,9 +327,9 @@
             return false;
         }
 
-        // --- AI CHAT LOGIC (Active) ---
-        function addMessage(sender, text) {
-            var messageContainer = document.getElementById('ai-messages');
+        // --- CHAT LOGIC (Helper Function) ---
+        function addMessageToChat(containerId, sender, text) {
+            var messageContainer = document.getElementById(containerId);
             var isUser = (sender === 'User');
 
             var messageHTML = 
@@ -347,6 +347,7 @@
             }, 100);
         }
 
+        // --- AI CHAT LOGIC (Active) ---
         function handleAIChatSubmit(event) {
             event.preventDefault(); 
             var inputField = document.getElementById('ai-input');
@@ -354,7 +355,7 @@
 
             if (userInput === '') return;
 
-            addMessage('User', userInput);
+            addMessageToChat('ai-messages', 'User', userInput);
             inputField.value = ''; 
 
             setTimeout(function() {
@@ -364,9 +365,28 @@
                     responseText = "AI Estimation: इस आइटम का अनुशंसित Pi मूल्य 150-200 Pi के बीच है।";
                 }
                 
-                addMessage('AI', responseText);
+                addMessageToChat('ai-messages', 'AI', responseText);
             }, 1000); 
         }
+
+        // --- CHAT PAGE SUBMIT LOGIC (Active) ---
+        function handleChatSubmit(event) {
+            event.preventDefault(); 
+            var inputField = document.getElementById('chat-input');
+            var userInput = inputField.value.trim();
+
+            if (userInput === '') return;
+
+            // DUMMY MESSAGE SUBMIT: User message added to the main chat container
+            addMessageToChat('chat-history-container', 'User', userInput);
+            inputField.value = ''; 
+
+            // DUMMY REPLY
+            setTimeout(function() {
+                addMessageToChat('chat-history-container', 'Other', 'जी, बिल्कुल। मैं जल्द ही आपको शिपिंग डिटेल्स भेजता हूँ।');
+            }, 1500); 
+        }
+
 
         // --- NAVIGATION LOGIC ---
         function setupNavigation() {
@@ -516,6 +536,3 @@
             loadPiSdkScript(); // START the SDK loading process
         };
     </script>
-
-</body>
-</html>
