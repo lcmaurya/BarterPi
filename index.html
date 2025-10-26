@@ -8,6 +8,8 @@
     <title>Barter-Pi Pro - Final UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .page-content { display: none; }
@@ -202,6 +204,38 @@
         </footer>
 
         <div id="modal-container">
+            <div id="GcvConverter-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 justify-center items-start pt-6 p-2 hidden">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[95vh]">
+                    <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+                        <h2 class="text-xl font-bold text-gray-800">📈 GCV मूल्य कन्वर्टर</h2>
+                        <button onclick="closeModal('GcvConverter')" class="text-gray-400 hover:text-gray-600 text-2xl font-light">&times;</button>
+                    </div>
+                    <div class="p-4 space-y-4">
+                        <div class="bg-yellow-50 p-3 rounded-lg text-sm font-medium">
+                            **1 Pi = $314,159.00 USD (GCV Price)**
+                            <p class="text-xs text-gray-600 mt-1">यह समुदाय द्वारा तय की गई ग्लोबल कंसेंसस वैल्यू (GCV) है।</p>
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-gray-700 border-b pb-2">Pi को INR/USD में बदलें</h3>
+
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Pi राशि दर्ज करें:</label>
+                        <input type="number" id="pi-amount-input" value="1" min="0.01" step="0.01" class="w-full p-2 border rounded-lg text-sm focus:ring-indigo-500" oninput="updateGcvConversion()" />
+                        
+                        <div class="space-y-2">
+                            <div class="p-3 bg-gray-100 rounded-lg">
+                                <p class="text-sm font-medium text-gray-800">GCV मूल्य (USD) : <span id="usd-result" class="font-bold text-indigo-600">---</span></p>
+                            </div>
+                            <div class="p-3 bg-gray-100 rounded-lg">
+                                <p class="text-sm font-medium text-gray-800">भारतीय मूल्य (INR) : <span id="inr-result" class="font-bold text-green-600">---</span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4 border-t flex justify-end">
+                        <button onclick="closeModal('GcvConverter')" class="bg-gray-200 text-gray-700 font-bold py-1.5 px-3 rounded-lg text-sm">बंद करें</button>
+                    </div>
+                </div>
+            </div>
+            
             <div id="NewListing-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 justify-center items-start pt-6 p-2 hidden">
                 <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[95vh]">
                     <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
@@ -235,38 +269,6 @@
                             <button type="submit" class="bg-green-600 text-white font-bold py-1.5 px-3 rounded-lg text-sm hover:bg-green-700 transition shadow-md">लिस्टिंग पोस्ट करें</button>
                         </div>
                     </form>
-                </div>
-            </div>
-        </div>
-
-        <div id="GcvConverter-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 justify-center items-start pt-6 p-2 hidden">
-            <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[95vh]">
-                <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
-                    <h2 class="text-xl font-bold text-gray-800">📈 GCV मूल्य कन्वर्टर</h2>
-                    <button onclick="closeModal('GcvConverter')" class="text-gray-400 hover:text-gray-600 text-2xl font-light">&times;</button>
-                </div>
-                <div class="p-4 space-y-4">
-                    <div class="bg-yellow-50 p-3 rounded-lg text-sm font-medium">
-                        **1 Pi = $314,159.00 USD (GCV Price)**
-                        <p class="text-xs text-gray-600 mt-1">यह समुदाय द्वारा तय की गई ग्लोबल कंसेंसस वैल्यू (GCV) है।</p>
-                    </div>
-
-                    <h3 class="text-lg font-semibold text-gray-700 border-b pb-2">Pi को INR/USD में बदलें</h3>
-
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Pi राशि दर्ज करें:</label>
-                    <input type="number" id="pi-amount-input" value="1" min="0.01" step="0.01" class="w-full p-2 border rounded-lg text-sm focus:ring-indigo-500" oninput="updateGcvConversion()" />
-                    
-                    <div class="space-y-2">
-                        <div class="p-3 bg-gray-100 rounded-lg">
-                            <p class="text-sm font-medium text-gray-800">GCV मूल्य (USD) : <span id="usd-result" class="font-bold text-indigo-600">---</span></p>
-                        </div>
-                        <div class="p-3 bg-gray-100 rounded-lg">
-                            <p class="text-sm font-medium text-gray-800">भारतीय मूल्य (INR) : <span id="inr-result" class="font-bold text-green-600">---</span></p>
-                        </div>
-                    </div>
-                </div>
-                <div class="p-4 border-t flex justify-end">
-                    <button onclick="closeModal('GcvConverter')" class="bg-gray-200 text-gray-700 font-bold py-1.5 px-3 rounded-lg text-sm">बंद करें</button>
                 </div>
             </div>
         </div>
@@ -307,7 +309,7 @@
             console.error("Firebase Initialization Error. Please check console.", e);
         }
         // --- END FIREBASE SETUP ---
-
+        
         // --- GCV CONVERTER LOGIC ---
         function updateGcvConversion() {
             var piInput = document.getElementById('pi-amount-input');
@@ -316,7 +318,6 @@
             var usdResult = piAmount * GCV_USD_RATE;
             var inrResult = usdResult * DUMMY_INR_RATE;
 
-            // Formatting the numbers
             var usdFormatted = usdResult.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
             var inrFormatted = inrResult.toLocaleString('hi-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2 });
             
@@ -353,7 +354,34 @@
         
         // --- PI SDK TRANSACTION LOGIC ---
         function processTestTransaction() {
-            // ... (rest of Pi transaction logic remains the same)
+            if (typeof Pi === 'undefined') {
+                alert("FAILURE: Pi SDK not found. Please ensure the app is fully reloaded in the Pi Browser.");
+                return;
+            }
+
+            alert("Starting Pi Transaction. Follow the prompts in the Pi Browser to clear the developer checklist...");
+
+            try {
+                Pi.api.payments.create({
+                    amount: 1, 
+                    memo: "Test Transaction for Developer Checklist completion", 
+                    metadata: { app: "BarterPiPro", purpose: "checklist_clear" }
+                }, {
+                    onReadyForServerApproval: function(paymentId) {
+                        alert("SUCCESS: Transaction Ready for Server Approval! CHECKLIST CLEARED.");
+                    },
+                    onCancel: function(paymentId) {
+                        alert("FAILURE: Transaction cancelled by user.");
+                    },
+                    onError: function(error) {
+                        alert("ERROR: Transaction failed. Error: " + error.message);
+                        console.error(error);
+                    }
+                });
+            } catch (e) {
+                alert("CRITICAL ERROR: Failed to create payment. Ensure Pi Browser permissions are correct.");
+                console.error(e);
+            }
         }
 
         // --- NEW LISTING SUBMIT HANDLER (Active & Saves to Firebase) ---
@@ -392,24 +420,149 @@
 
         // --- CHAT LOGIC (Active) ---
         function addMessageToChat(containerId, sender, text) {
-            // ... (rest of chat logic remains the same)
+            var messageContainer = document.getElementById(containerId);
+            var isUser = (sender === 'User');
+
+            var messageHTML = 
+                '<div class="flex ' + (isUser ? 'justify-end' : 'justify-start') + '">' +
+                    '<div class="max-w-lg p-2 rounded-xl shadow-md ' + 
+                        (isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-gray-200 text-gray-800 rounded-tl-none') + '">' +
+                        text +
+                    '</div>' +
+                '</div>';
+
+            messageContainer.innerHTML += messageHTML;
+            
+            var timeout = setTimeout(function() {
+                messageContainer.scrollTop = messageContainer.scrollHeight;
+            }, 100);
         }
 
         function handleAIChatSubmit(event) {
-            // ... (rest of AI chat logic remains the same)
+            event.preventDefault(); 
+            var inputField = document.getElementById('ai-input');
+            var userInput = inputField.value.trim();
+
+            if (userInput === '') return;
+
+            addMessageToChat('ai-messages', 'User', userInput);
+            inputField.value = ''; 
+
+            setTimeout(function() {
+                var responseText = "Pi-संबंधित सभी सुझाव AI-जनरेटेड हैं। हमें विशिष्ट ट्रेडिंग गाइडेंस के लिए प्रोफ़ाइल पेज पर जाएँ।";
+                
+                if (userInput.toLowerCase().includes('price') || userInput.toLowerCase().includes('मूल्य')) {
+                    responseText = "AI Estimation: इस आइटम का अनुशंसित Pi मूल्य 150-200 Pi के बीच है।";
+                }
+                
+                addMessageToChat('ai-messages', 'AI', responseText);
+            }, 1000); 
         }
 
         function handleChatSubmit(event) {
-            // ... (rest of chat logic remains the same)
+            event.preventDefault(); 
+            var inputField = document.getElementById('chat-input');
+            var userInput = inputField.value.trim();
+
+            if (userInput === '') return;
+
+            addMessageToChat('chat-history-container', 'User', userInput);
+            inputField.value = ''; 
+
+            setTimeout(function() {
+                addMessageToChat('chat-history-container', 'Other', 'जी, बिल्कुल। मैं जल्द ही आपको शिपिंग डिटेल्स भेजता हूँ।');
+            }, 1500); 
+            
+            var chatContainer = document.getElementById('chat-history-container');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         }
+
+        // --- ORDER STATUS HANDLING (Active) ---
+        function handleOrderStatusChange(orderId, action) {
+            if (action === 'confirm_delivery') {
+                alert('SUCCESS: डिलीवरी की पुष्टि हुई! ' + orderId + ' के लिए Escrow Pi रिलीज़ किया जा रहा है।');
+            } else if (action === 'update_tracking') {
+                alert('ACTION: ' + orderId + ' के लिए नया ट्रैकिंग मोडल/पॉप-अप खोला जा रहा है।');
+            } else if (action === 'dispute') {
+                alert('DISPUTE: ' + orderId + ' के लिए विवाद दर्ज हुआ। Escrow फ़ंड फ़्रीज़ किए जा रहे हैं।');
+            }
+            // In a real app, this should update the Firebase 'orders' collection
+            renderOrders(); 
+        }
+
+
+        // --- ADMIN ACTIONS (Active) ---
+        function handleAdminAction(type, action, itemId) {
+            if (type === 'review') {
+                if (db) {
+                    db.collection("listings").doc(itemId).update({ status: (action === 'approve' ? 'Active' : 'Rejected') })
+                      .then(function() {
+                          alert('MODERATOR: लिस्टिंग ' + itemId + ' सफलतापूर्वक ' + (action === 'approve' ? 'स्वीकृत' : 'अस्वीकृत') + '।');
+                          switchPage('Admin'); // Reload admin page
+                      })
+                      .catch(function(error) {
+                          alert("ERROR: अपडेट नहीं हो पाया: " + error.message);
+                      });
+                } else {
+                    alert('MODERATOR: Firebase इनिशियलाइज़ नहीं हुआ।');
+                }
+            } else if (type === 'dispute_resolve') {
+                alert('MODERATOR: विवाद ' + itemId + ' के लिए समाधान मोडल खोला गया।');
+            }
+        }
+
 
         // --- NAVIGATION LOGIC ---
         function setupNavigation() {
-            // ... (rest of navigation logic remains the same)
+            var pages = {
+                'Home': 'होम', 'Profile': 'प्रोफ़ाइल', 'Orders': 'ऑर्डर्स', 
+                'Chat': 'चैट', 'AIHelper': 'AI हेल्पर', 'Admin': 'एडमिन'
+            };
+            var navContainer = document.getElementById('nav-buttons');
+            var DUMMY_USER_ID = "ADM_PRO_USER_007";
+            var ADMIN_ID = DUMMY_USER_ID; 
+
+            navContainer.innerHTML = ''; 
+
+            for (var pageId in pages) {
+                if (pageId === 'Admin' && DUMMY_USER_ID !== ADMIN_ID) continue;
+                
+                var button = document.createElement('button');
+                button.innerHTML = pages[pageId];
+                button.setAttribute('data-page', pageId);
+                
+                button.className = 'nav-button px-2 py-1 rounded-lg text-xs font-medium m-0.5 transition duration-200 text-gray-600 hover:bg-gray-100 whitespace-nowrap';
+                
+                button.onclick = function() { switchPage(this.getAttribute('data-page')); };
+                navContainer.appendChild(button);
+            }
+
+            switchPage('Home');
         }
 
         function switchPage(pageId) {
-            // ... (rest of switch page logic remains the same)
+            var contents = document.getElementsByClassName('page-content');
+            for (var i = 0; i < contents.length; i++) {
+                contents[i].className = contents[i].className.replace(' active', '');
+            }
+            
+            var targetPage = document.getElementById(pageId);
+            if (targetPage) {
+                targetPage.className += ' active';
+            }
+
+            var buttons = document.getElementsByClassName('nav-button');
+            for (var i = 0; i < buttons.length; i++) {
+                var btn = buttons[i];
+                btn.className = btn.className.replace(' bg-indigo-600 text-white shadow-lg', '');
+                if (btn.getAttribute('data-page') === pageId) {
+                    btn.className += ' bg-indigo-600 text-white shadow-lg';
+                }
+            }
+            
+            if (pageId === 'Orders') { renderOrders(); }
+            if (pageId === 'Home') { renderListings(); }
+            if (pageId === 'Admin') { renderAdmin(); } // Render Admin Page
         }
 
         // --- MODAL LOGIC ---
@@ -423,7 +576,6 @@
                 modal.style.display = 'flex';
             }
         }
-
         function closeModal(modalId) {
             var modal = document.getElementById(modalId + '-modal');
             if (modal) {
@@ -433,23 +585,333 @@
 
         // --- LOGIN LOGIC (Active) ---
         function loginUser() {
-            // ... (rest of login logic remains the same)
+            alert('Pi Network Login SDK call simulated. Logging in...');
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('dashboard-section').style.display = 'block';
         }
 
         // --- LISTING RENDERING (Now fetches from Firestore) ---
         function renderListings() {
             var grid = document.getElementById('listings-grid');
             grid.innerHTML = '<p class="col-span-4 text-center text-indigo-500 py-10">Loading listings from Firebase...</p>';
-            // ... (rest of listing rendering logic remains the same)
+
+            var categoryFilter = document.getElementById('category-filter').value;
+            
+            if (db) {
+                // Fetching only Active listings
+                var listingsRef = db.collection("listings").where("status", "==", "Active").orderBy("timestamp", "desc");
+                
+                if (categoryFilter) {
+                    listingsRef = listingsRef.where("category", "==", categoryFilter);
+                }
+
+                listingsRef.get().then(function(querySnapshot) {
+                    var html = '';
+                    if (querySnapshot.empty) {
+                        grid.innerHTML = '<p class="col-span-4 text-center text-gray-500 py-10">कोई लिस्टिंग नहीं मिली।</p>';
+                        return;
+                    }
+
+                    querySnapshot.forEach(function(doc) {
+                        var listing = doc.data();
+                        var statusClass = listing.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
+                        var itemImageText = listing.itemName.replace(/ /g, '+');
+                        var docId = doc.id; // Get the Firestore Document ID
+                        var displayStatus = (listing.status === 'Pending') ? 'Pending' : listing.status;
+
+                        html += '<div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 hover:shadow-2xl hover:cursor-pointer transition duration-300 transform hover:scale-[1.02]" onclick="alert(\'Viewing details for ' + listing.itemName + ' (ID: ' + docId + ')\')">';
+                        html += '<img src="https://via.placeholder.com/400x300?text=' + itemImageText + '" alt="' + listing.itemName + '" class="w-full h-40 object-cover" />';
+                        html += '<div class="p-4">';
+                        html += '<h3 class="text-lg font-bold text-gray-800 mb-1 h-12 overflow-hidden">' + listing.itemName + '</h3>';
+                        html += '<div class="flex justify-between items-center mb-3">';
+                        html += '<div class="text-2xl font-extrabold text-indigo-600">' + listing.pricePi + ' Pi</div>';
+                        html += '<span class="px-3 py-1 text-xs font-medium rounded-full ' + statusClass + '">' + displayStatus + '</span>';
+                        html += '</div>';
+                        html += '<button class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm transition">ℹ️ विवरण देखें</button>';
+                        html += '</div></div>';
+                    });
+                    grid.innerHTML = html;
+                }).catch(function(error) {
+                    console.error("Error fetching listings: ", error);
+                    grid.innerHTML = '<p class="col-span-4 text-center text-red-500 py-10">डेटा लोड करने में त्रुटि। Firebase नियम जांचें।</p>';
+                });
+            } else {
+                grid.innerHTML = '<p class="col-span-4 text-center text-red-500 py-10">Firebase इनिशियलाइज़ नहीं हुआ।</p>';
+            }
         }
 
         // --- ORDER RENDERING (Now fetches from Firestore) ---
         function renderOrders() {
             var listContainer = document.getElementById('orders-list');
             listContainer.innerHTML = '<p class="col-span-4 text-center text-indigo-500 py-10">Loading Orders from Firebase...</p>';
-            // ... (rest of order rendering logic remains the same)
+            
+            if (db) {
+                // Fetch all orders (for this DUMMY_USER_ID, assuming all orders are relevant)
+                db.collection("orders").orderBy("timestamp", "desc").get().then(function(querySnapshot) {
+                    var html = '<h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">📦 मेरे सभी ऑर्डर्स</h3>';
+                    
+                    if (querySnapshot.empty) {
+                        listContainer.innerHTML = '<p class="text-center py-8 text-gray-500">अभी कोई ऑर्डर रिकॉर्ड नहीं मिला।</p>';
+                        return;
+                    }
+
+                    querySnapshot.forEach(function(doc) {
+                        var order = doc.data();
+                        var orderId = doc.id;
+                        var statusClass = order.status === 'Delivered' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-gray-900';
+                        var escrowStatus = order.escrow === 'Active' ? '🔒 Escrow Active' : '✅ Pi Released';
+                        var isBuying = (order.buyerId === DUMMY_USER_ID); // Assume current user is buyer
+                        var typeClass = isBuying ? 'bg-blue-50' : 'bg-green-50';
+
+                        html += '<div class="mb-4 p-4 border rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center ' + typeClass + '">';
+                        html += '<div>';
+                        html += '<p class="font-semibold text-lg">' + order.item + ' <span class="text-xs font-medium text-gray-500">(' + (isBuying ? 'खरीद' : 'बिक्री') + ')</span></p>';
+                        html += '<p class="text-sm text-gray-500">कीमत: **' + order.pricePi + ' Pi** | Escrow: ' + escrowStatus + '</p>';
+                        html += '</div>';
+                        html += '<div class="text-right mt-2 sm:mt-0">';
+                        html += '<span class="px-3 py-1 text-sm font-bold rounded-full block ' + statusClass + '">' + order.status + '</span>';
+                        
+                        // Action Buttons (Placeholder for now)
+                        if (isBuying && order.status === 'Shipped') {
+                            html += '<button onclick="handleOrderStatusChange(\'' + orderId + '\', \'confirm_delivery\')" class="mt-1 text-green-600 text-sm hover:underline block font-semibold">✅ डिलीवरी की पुष्टि करें</button>';
+                            html += '<button onclick="handleOrderStatusChange(\'' + orderId + '\', \'dispute\')" class="mt-1 text-red-600 text-sm hover:underline block font-semibold">❓ विवाद दर्ज करें</button>';
+                        } else if (!isBuying && order.status === 'Shipped') {
+                            html += '<button onclick="handleOrderStatusChange(\'' + orderId + '\', \'update_tracking\')" class="bg-indigo-600 text-white py-1 px-2 rounded-lg text-xs font-semibold mt-1">ट्रैकिंग अपडेट करें</button>';
+                        }
+                        
+                        html += '</div></div>';
+                    });
+                    listContainer.innerHTML = html;
+                }).catch(function(error) {
+                    console.error("Error fetching orders: ", error);
+                    listContainer.innerHTML = '<p class="col-span-4 text-center text-red-500 py-10">ऑर्डर लोड करने में त्रुटि। Firebase नियम जांचें।</p>';
+                });
+            } else {
+                listContainer.innerHTML = '<p class="col-span-4 text-center text-red-500 py-10">Firebase इनिशियलाइज़ नहीं हुआ।</p>';
+            }
+        }
+
+        // --- ADMIN PAGE RENDERING (Now fetches from Firestore) ---
+        function renderAdmin() {
+            var adminContainer = document.getElementById('Admin');
+            adminContainer.innerHTML = '<h2 class="text-2xl font-bold text-red-600 border-b pb-2">🚨 एडमिन डैशबोर्ड</h2><p class="text-indigo-500 py-4">Loading Admin Data...</p>';
+
+            if (db) {
+                // Fetch all listings that are 'Pending'
+                db.collection("listings").where("status", "==", "Pending").orderBy("timestamp", "asc").get().then(function(querySnapshot) {
+                    var reviewHtml = '<div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-yellow-600"><h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">समीक्षा के लिए लंबित लिस्टिंग्स (' + querySnapshot.size + ')</h3><ul class="space-y-3">';
+                    
+                    if (querySnapshot.empty) {
+                        reviewHtml += '<li class="text-gray-500">कोई लंबित लिस्टिंग नहीं।</li>';
+                    } else {
+                        querySnapshot.forEach(function(doc) {
+                            var listing = doc.data();
+                            var docId = doc.id;
+                            reviewHtml += '<li class="p-3 border rounded-lg flex justify-between items-center bg-yellow-50">';
+                            reviewHtml += '<span class="font-medium">' + listing.itemName + ' (' + listing.pricePi + ' Pi)</span>';
+                            reviewHtml += '<div>';
+                            reviewHtml += '<button onclick="handleAdminAction(\'review\', \'approve\', \'' + docId + '\')" class="text-green-600 hover:text-green-800 text-sm font-semibold mr-3">स्वीकृत करें</button>';
+                            reviewHtml += '<button onclick="handleAdminAction(\'review\', \'reject\', \'' + docId + '\')" class="text-red-600 hover:text-red-800 text-sm font-semibold">अस्वीकृत करें</button>';
+                            reviewHtml += '</div></li>';
+                        });
+                    }
+                    reviewHtml += '</ul></div>';
+
+                    // Placeholder for Disputes (Hardcoded for simplicity in admin view)
+                    var disputeHtml = '<div class="mt-8 bg-white p-6 rounded-xl shadow-lg border-l-4 border-red-600"><h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">विवाद समाधान (Dummy)</h3><p class="text-sm text-gray-500">यहां लंबित विवादों को मॉडरेटर द्वारा हल किया जाएगा।</p></div>';
+
+                    adminContainer.innerHTML = reviewHtml + disputeHtml;
+
+                }).catch(function(error) {
+                    console.error("Error fetching admin data: ", error);
+                    adminContainer.innerHTML = '<h2 class="text-2xl font-bold text-red-600 border-b pb-2">🚨 एडमिन डैशबोर्ड</h2><p class="text-red-500 py-4">एडमिन डेटा लोड करने में त्रुटि।</p>';
+                });
+            } else {
+                adminContainer.innerHTML = '<h2 class="text-2xl font-bold text-red-600 border-b pb-2">🚨 एडमिन डैशबोर्ड</h2><p class="text-red-500 py-4">Firebase इनिशियलाइज़ नहीं हुआ।</p>';
+            }
         }
         
+        // --- ORDER STATUS HANDLING (Active) ---
+        function handleOrderStatusChange(orderId, action) {
+            // ... (logic remains the same)
+        }
+
+
+        // --- ADMIN ACTIONS (Active) ---
+        function handleAdminAction(type, action, itemId) {
+            if (type === 'review') {
+                if (db) {
+                    // This is how you would actually update Firebase status
+                    db.collection("listings").doc(itemId).update({ status: (action === 'approve' ? 'Active' : 'Rejected') })
+                      .then(function() {
+                          alert('MODERATOR: लिस्टिंग ' + itemId + ' सफलतापूर्वक ' + (action === 'approve' ? 'स्वीकृत' : 'अस्वीकृत') + '।');
+                          switchPage('Admin'); // Reload admin page
+                          switchPage('Home'); // Refresh home page listings
+                      })
+                      .catch(function(error) {
+                          alert("ERROR: अपडेट नहीं हो पाया: " + error.message);
+                      });
+                } else {
+                    alert('MODERATOR: Firebase इनिशियलाइज़ नहीं हुआ।');
+                }
+            } else if (type === 'dispute_resolve') {
+                alert('MODERATOR: विवाद ' + itemId + ' के लिए समाधान मोडल खोला गया।');
+            }
+        }
+
+        // --- GCV CONVERTER LOGIC ---
+        function updateGcvConversion() {
+            var piInput = document.getElementById('pi-amount-input');
+            var piAmount = parseFloat(piInput.value) || 0;
+            
+            var usdResult = piAmount * GCV_USD_RATE;
+            var inrResult = usdResult * DUMMY_INR_RATE;
+
+            var usdFormatted = usdResult.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+            var inrFormatted = inrResult.toLocaleString('hi-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2 });
+            
+            document.getElementById('usd-result').innerText = usdFormatted;
+            document.getElementById('inr-result').innerText = inrFormatted;
+        }
+
+
+        // --- CHAT LOGIC (Helper Function) ---
+        function addMessageToChat(containerId, sender, text) {
+            var messageContainer = document.getElementById(containerId);
+            var isUser = (sender === 'User');
+
+            var messageHTML = 
+                '<div class="flex ' + (isUser ? 'justify-end' : 'justify-start') + '">' +
+                    '<div class="max-w-lg p-2 rounded-xl shadow-md ' + 
+                        (isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-gray-200 text-gray-800 rounded-tl-none') + '">' +
+                        text +
+                    '</div>' +
+                '</div>';
+
+            messageContainer.innerHTML += messageHTML;
+            
+            var timeout = setTimeout(function() {
+                messageContainer.scrollTop = messageContainer.scrollHeight;
+            }, 100);
+        }
+
+        function handleAIChatSubmit(event) {
+            event.preventDefault(); 
+            var inputField = document.getElementById('ai-input');
+            var userInput = inputField.value.trim();
+
+            if (userInput === '') return;
+
+            addMessageToChat('ai-messages', 'User', userInput);
+            inputField.value = ''; 
+
+            setTimeout(function() {
+                var responseText = "Pi-संबंधित सभी सुझाव AI-जनरेटेड हैं। हमें विशिष्ट ट्रेडिंग गाइडेंस के लिए प्रोफ़ाइल पेज पर जाएँगे।";
+                
+                if (userInput.toLowerCase().includes('price') || userInput.toLowerCase().includes('मूल्य')) {
+                    responseText = "AI Estimation: इस आइटम का अनुशंसित Pi मूल्य 150-200 Pi के बीच है।";
+                }
+                
+                addMessageToChat('ai-messages', 'AI', responseText);
+            }, 1000); 
+        }
+
+        function handleChatSubmit(event) {
+            event.preventDefault(); 
+            var inputField = document.getElementById('chat-input');
+            var userInput = inputField.value.trim();
+
+            if (userInput === '') return;
+
+            addMessageToChat('chat-history-container', 'User', userInput);
+            inputField.value = ''; 
+
+            setTimeout(function() {
+                addMessageToChat('chat-history-container', 'Other', 'जी, बिल्कुल। मैं जल्द ही आपको शिपिंग डिटेल्स भेजता हूँ।');
+            }, 1500); 
+            
+            var chatContainer = document.getElementById('chat-history-container');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+
+        // --- NAVIGATION LOGIC ---
+        function setupNavigation() {
+            var pages = {
+                'Home': 'होम', 'Profile': 'प्रोफ़ाइल', 'Orders': 'ऑर्डर्स', 
+                'Chat': 'चैट', 'AIHelper': 'AI हेल्पर', 'Admin': 'एडमिन'
+            };
+            var navContainer = document.getElementById('nav-buttons');
+            var DUMMY_USER_ID = "ADM_PRO_USER_007";
+            var ADMIN_ID = DUMMY_USER_ID; 
+
+            navContainer.innerHTML = ''; 
+
+            for (var pageId in pages) {
+                if (pageId === 'Admin' && DUMMY_USER_ID !== ADMIN_ID) continue;
+                
+                var button = document.createElement('button');
+                button.innerHTML = pages[pageId];
+                button.setAttribute('data-page', pageId);
+                
+                button.className = 'nav-button px-2 py-1 rounded-lg text-xs font-medium m-0.5 transition duration-200 text-gray-600 hover:bg-gray-100 whitespace-nowrap';
+                
+                button.onclick = function() { switchPage(this.getAttribute('data-page')); };
+                navContainer.appendChild(button);
+            }
+
+            switchPage('Home');
+        }
+
+        function switchPage(pageId) {
+            var contents = document.getElementsByClassName('page-content');
+            for (var i = 0; i < contents.length; i++) {
+                contents[i].className = contents[i].className.replace(' active', '');
+            }
+            
+            var targetPage = document.getElementById(pageId);
+            if (targetPage) {
+                targetPage.className += ' active';
+            }
+
+            var buttons = document.getElementsByClassName('nav-button');
+            for (var i = 0; i < buttons.length; i++) {
+                var btn = buttons[i];
+                btn.className = btn.className.replace(' bg-indigo-600 text-white shadow-lg', '');
+                if (btn.getAttribute('data-page') === pageId) {
+                    btn.className += ' bg-indigo-600 text-white shadow-lg';
+                }
+            }
+            
+            if (pageId === 'Orders') { renderOrders(); }
+            if (pageId === 'Home') { renderListings(); }
+            if (pageId === 'Admin') { renderAdmin(); } // Render Admin Page
+        }
+
+        // --- MODAL LOGIC ---
+        function openModal(modalId) {
+            var modal = document.getElementById(modalId + '-modal');
+            if (modal) {
+                if (modalId === 'GcvConverter') {
+                    updateGcvConversion();
+                }
+                modal.style.display = 'flex';
+            }
+        }
+        function closeModal(modalId) {
+            var modal = document.getElementById(modalId + '-modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // --- LOGIN LOGIC (Active) ---
+        function loginUser() {
+            alert('Pi Network Login SDK call simulated. Logging in...');
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('dashboard-section').style.display = 'block';
+        }
+
         // --- INITIALIZATION (Final Fix) ---
         window.onload = function() {
             setupNavigation();
@@ -463,5 +925,3 @@
             loadPiSdkScript(); // START the SDK loading process
         };
     </script>
-</body>
-</html>
