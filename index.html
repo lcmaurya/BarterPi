@@ -255,11 +255,11 @@
             { id: 'o2', item: 'Laptop Repair', price: 35, status: 'Delivered', escrow: 'Released', type: 'sell' },
         ];
 
-        // --- PI SDK READY CHECK ---
+        // --- PI SDK READY CHECK & INIT (Final Fix) ---
         function checkPiReady() {
             var piButton = document.getElementById('test-pi-button');
             if (typeof Pi !== 'undefined') {
-                // Now check if it's initialized correctly
+                // Pi object found, now try to initialize it
                 try {
                     Pi.init({
                         onReady: function () {
@@ -270,7 +270,7 @@
                         }
                     });
                 } catch (e) {
-                    // SDK found but initialization failed (rare)
+                    // Initialization failed (rare, but possible due to Pi Browser version mismatch)
                     piButton.innerText = '⚠️ INIT ERROR'; 
                 }
             } else {
@@ -411,7 +411,7 @@
                  return;
             }
 
-            for (var i = 0; i < filteredListings.length; i++) {
+            for (var i = 0; i < DUMMY_LISTINGS.length; i++) {
                 var listing = DUMMY_LISTINGS[i];
                 var statusClass = listing.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
                 
