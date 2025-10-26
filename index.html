@@ -519,13 +519,42 @@
                 html += '<div class="text-right mt-2 sm:mt-0">';
                 html += '<span class="px-3 py-1 text-sm font-bold rounded-full block ' + statusClass + '">' + order.status + '</span>';
                 if (order.status === 'Shipped' && order.type === 'buy') {
-                    html += '<button onclick="alert(\'Delivery Confirmed!\')" class="mt-1 text-green-600 text-sm hover:underline block font-semibold">✅ डिलीवरी की पुष्टि करें</button>';
+                    html += '<button onclick="handleOrderStatusChange(\'' + order.id + '\', \'confirm_delivery\')" class="mt-1 text-green-600 text-sm hover:underline block font-semibold">✅ डिलीवरी की पुष्टि करें</button>';
+                    html += '<button onclick="handleOrderStatusChange(\'' + order.id + '\', \'dispute\')" class="mt-1 text-red-600 text-sm hover:underline block font-semibold">❓ विवाद दर्ज करें</button>';
+                }
+                if (order.status === 'Shipped' && order.type === 'sell') {
+                    html += '<button onclick="handleOrderStatusChange(\'' + order.id + '\', \'update_tracking\')" class="bg-indigo-600 text-white py-1 px-2 rounded-lg text-xs font-semibold mt-1">ट्रैकिंग अपडेट करें</button>';
                 }
                 html += '</div></div>';
             }
             listContainer.innerHTML = html;
         }
 
+        // --- ORDER STATUS HANDLING (Active) ---
+        function handleOrderStatusChange(orderId, action) {
+            if (action === 'confirm_delivery') {
+                alert('SUCCESS: डिलीवरी की पुष्टि हुई! ' + orderId + ' के लिए Escrow Pi रिलीज़ किया जा रहा है।');
+            } else if (action === 'update_tracking') {
+                alert('ACTION: ' + orderId + ' के लिए नया ट्रैकिंग मोडल/पॉप-अप खोला जा रहा है।');
+            } else if (action === 'dispute') {
+                alert('DISPUTE: ' + orderId + ' के लिए विवाद दर्ज हुआ। Escrow फ़ंड फ़्रीज़ किए जा रहे हैं।');
+            }
+            renderOrders(); 
+        }
+
+        // --- ADMIN ACTIONS (Active) ---
+        function handleAdminAction(type, action, itemId) {
+            if (type === 'review') {
+                if (action === 'approve') {
+                    alert('MODERATOR: लिस्टिंग ' + itemId + ' स्वीकृत (Approved)।');
+                } else {
+                    alert('MODERATOR: लिस्टिंग ' + itemId + ' अस्वीकृत (Rejected)।');
+                }
+            } else if (type === 'dispute_resolve') {
+                alert('MODERATOR: विवाद ' + itemId + ' के लिए समाधान मोडल खोला गया।');
+            }
+        }
+        
         // --- INITIALIZATION (Final Fix) ---
         window.onload = function() {
             setupNavigation();
