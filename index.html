@@ -5,295 +5,274 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#000000" />
     <meta name="description" content="Pi Network Barter Application" />
-    <title>Barter-Pi App</title>
-    <!-- Tailwind CSS (CDN) -->
+    <title>Barter-Pi Pro - Static UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 'Inter' font for modern look */
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-    <!-- React app को इस div में लोड करेगा -->
     <div id="root"></div>
 
-    <!-- React और ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <!-- Babel (JSX को JS में ट्रांसपाइल करने के लिए) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Firebase Imports: ये सभी ज़रूरी मॉड्यूल्स को लोड करते हैं -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global variables को window object पर expose करना ताकि React component इन्हें इस्तेमाल कर सके
-        window.firebase = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, onSnapshot, collection, query, where, addDoc, serverTimestamp, setLogLevel };
-    </script>
-
-    <!-- React Component Code (Babel type) -->
     <script type="text/babel">
-        const AppContext = React.createContext(null);
-        
-        // Global variables को एक्सेस करना
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        // --- 1. Firebase Initialization and Authentication Hook ---
+        const DUMMY_USER_ID = "ADM_PRO_USER_007";
+        const ADMIN_ID = DUMMY_USER_ID;
 
-        function useFirebaseInit() {
-            const [db, setDb] = React.useState(null);
-            const [auth, setAuth] = React.useState(null);
-            const [userId, setUserId] = React.useState(null);
-            const [isAuthReady, setIsAuthReady] = React.useState(false);
-            const [loading, setLoading] = React.useState(true);
-            const [error, setError] = React.useState(null);
+        // --- DUMMY DATA ---
+        const DUMMY_LISTINGS = [
+            {
+                id: 'l1',
+                itemName: 'Apple iPhone 14 Pro',
+                description: 'ब्रांड न्यू, सील पैक। 256GB, डीप पर्पल। विनिमय (Barter) या Pi दोनों के लिए उपलब्ध।',
+                pricePi: 450,
+                status: 'Active',
+                posterId: 'user_a01b2c3d',
+                image: 'https://via.placeholder.com/400x300?text=iPhone+14+Pro',
+                timestamp: new Date(Date.now() - 86400000),
+            },
+            {
+                id: 'l2',
+                itemName: 'पुराना साइकिल',
+                description: 'अच्छी कार्यशील स्थिति में, थोड़ी मरम्मत की आवश्यकता है। केवल स्थानीय पिकअप।',
+                pricePi: 5,
+                status: 'Active',
+                posterId: 'user_e4f5g6h7',
+                image: 'https://via.placeholder.com/400x300?text=Bicycle',
+                timestamp: new Date(Date.now() - 3600000),
+            },
+            {
+                id: 'l3',
+                itemName: 'वेबसाइट डिजाइन सेवा',
+                description: 'एक पेज की लैंडिंग पेज वेबसाइट का आकर्षक डिजाइन। 3 दिन में डिलीवरी।',
+                pricePi: 50,
+                status: 'Pending',
+                posterId: 'user_i8j9k0l1',
+                image: 'https://via.placeholder.com/400x300?text=Web+Design',
+                timestamp: new Date(Date.now() - 7200000),
+            },
+        ];
 
-            React.useEffect(() => {
-                if (Object.keys(firebaseConfig).length === 0) {
-                    console.error("Firebase Configuration is missing.");
-                    setLoading(false);
-                    setError("Firebase कॉन्फ़िगरेशन उपलब्ध नहीं है।");
-                    return;
-                }
+        const DUMMY_ORDERS = [
+            { id: 'o1', item: 'iPhone 14 Pro', price: 450, status: 'Shipped', tracking: 'TRK001', delivery: 'Local', buyerId: DUMMY_USER_ID },
+            { id: 'o2', item: 'Laptop Repair Service', price: 35, status: 'Delivered', tracking: 'TRK002', delivery: 'Global', buyerId: 'user_x9y0z1' },
+        ];
 
-                try {
-                    const app = window.firebase.initializeApp(firebaseConfig);
-                    const firestore = window.firebase.getFirestore(app);
-                    const authentication = window.firebase.getAuth(app);
-                    
-                    window.firebase.setLogLevel('debug'); // Debugging के लिए
-                    
-                    setDb(firestore);
-                    setAuth(authentication);
+        // --- COMPONENTS ---
 
-                    const unsubscribe = window.firebase.onAuthStateChanged(authentication, async (user) => {
-                        if (user) {
-                            setUserId(user.uid);
-                            setIsAuthReady(true);
-                            setLoading(false);
-                        } else {
-                            try {
-                                if (initialAuthToken) {
-                                    await window.firebase.signInWithCustomToken(authentication, initialAuthToken);
-                                } else {
-                                    // Anonymously sign in if no token is provided
-                                    await window.firebase.signInAnonymously(authentication);
-                                }
-                            } catch (e) {
-                                console.error("Firebase Sign In Error:", e);
-                                setError("लॉगिन में त्रुटि हुई।");
-                                setUserId(null); 
-                                setIsAuthReady(true);
-                                setLoading(false);
-                            }
-                        }
-                    });
+        const NavButton = ({ title, page, currentPage, setPage }) => (
+            <button
+                onClick={() => setPage(page)}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition duration-200 ${
+                    currentPage === page ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+            >
+                {title}
+            </button>
+        );
 
-                    return () => unsubscribe();
-                } catch (e) {
-                    console.error("Firebase Initialization Error:", e);
-                    setError(`Firebase शुरू करने में त्रुटि: ${e.message}`);
-                    setLoading(false);
-                }
-            }, []);
-
-            return { db, auth, userId, isAuthReady, loading, error };
-        }
-
-        // --- 2. Data Fetching Hook ---
-
-        function useBarterListings(db, isAuthReady, userId) {
-            const [listings, setListings] = React.useState([]);
-            const [isLoading, setIsLoading] = React.useState(true);
-            const [error, setError] = React.useState(null);
-
-            React.useEffect(() => {
-                if (!db || !isAuthReady) {
-                    // अगर Auth Ready नहीं है, तो अभी Fetch न करें
-                    return;
-                }
-
-                setIsLoading(true);
-
-                // Public collection path: /artifacts/{appId}/public/data/barter_listings
-                const collectionPath = `artifacts/${appId}/public/data/barter_listings`;
-                const listingsRef = window.firebase.collection(db, collectionPath);
-
-                // Real-time listener: onSnapshot
-                const unsubscribe = window.firebase.onSnapshot(listingsRef, 
-                    (snapshot) => {
-                        const loadedListings = [];
-                        snapshot.forEach((doc) => {
-                            loadedListings.push({ 
-                                id: doc.id, 
-                                ...doc.data() 
-                            });
-                        });
-                        
-                        // Newest first के लिए Sorting
-                        loadedListings.sort((a, b) => (b.timestamp?.toMillis() || 0) - (a.timestamp?.toMillis() || 0));
-
-                        setListings(loadedListings);
-                        setIsLoading(false);
-                        setError(null);
-                    }, 
-                    (err) => {
-                        console.error("Firestore Fetch Error:", err);
-                        // Security Rules की समस्या होने पर यह error आता है
-                        setError("लिस्टिंग लोड करने में त्रुटि हुई। कृपया Firestore Security Rules जाँचें।");
-                        setIsLoading(false);
-                    }
-                );
-
-                return () => unsubscribe();
-            }, [db, isAuthReady, appId, userId]);
-
-            return { listings, isLoading, error };
-        }
-
-        // --- 3. Component Definitions ---
-
-        const BarterListingCard = ({ listing }) => {
-            const date = listing.timestamp?.toDate ? listing.timestamp.toDate().toLocaleDateString('hi-IN') : 'N/A';
-            return (
-                <div className="bg-white p-6 rounded-xl shadow-lg border border-indigo-100 transition duration-300 transform hover:shadow-xl">
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">{listing.itemName || "Unnamed Item"}</h3>
-                    <p className="text-sm text-gray-500 mb-4 h-12 overflow-hidden">{listing.description || "कोई विवरण नहीं।"}</p>
-                    
-                    <div className="flex justify-between items-center mt-4 pt-3 border-t border-dashed border-gray-200">
-                        <div className="text-lg font-extrabold text-indigo-600">
-                            {listing.pricePi ? `${listing.pricePi} Pi` : "विनिमय के लिए"}
-                        </div>
-                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${listing.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {listing.status || 'Active'}
-                        </span>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2 flex justify-between">
-                        <span>पोस्टर: <span className="font-mono">{listing.posterId ? listing.posterId.substring(0, 8) + '...' : 'Unknown'}</span></span>
-                        <span>दिनांक: {date}</span>
-                    </p>
-                </div>
-            );
-        };
-
-        const ListingList = () => {
-            const { db, isAuthReady, userId } = React.useContext(AppContext);
-            const { listings, isLoading, error } = useBarterListings(db, isAuthReady, userId);
-
-            if (!isAuthReady) {
-                return <p className="text-center text-lg text-indigo-600 p-8">ऑथेंटिकेशन (Authentication) शुरू हो रहा है...</p>;
-            }
-
-            if (error) {
-                return (
-                    <div className="text-center p-8 bg-red-100 border border-red-400 rounded-lg shadow-md max-w-lg mx-auto mt-12">
-                        <p className="text-xl font-semibold text-red-700 mb-2">त्रुटि: डेटा लोड नहीं हो सका!</p>
-                        <p className="text-red-600 mb-4">{error}</p>
-                        <p className="text-sm text-red-500">
-                            **समाधान:** कृपया सुनिश्चित करें कि आपने अपने Firestore कंसोल में **Security Rules** को अपडेट कर दिया है।
-                        </p>
-                    </div>
-                );
-            }
-
-            if (isLoading) {
-                return (
-                    <div className="flex justify-center items-center p-8">
-                        <svg className="animate-spin -ml-1 mr-3 h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span className="text-lg font-medium text-indigo-600">लिस्टिंग लोड हो रही है...</span>
-                    </div>
-                );
-            }
-
-
-            if (listings.length === 0) {
-                return <p className="text-center text-lg text-gray-500 p-8 bg-gray-100 rounded-lg">कोई लिस्टिंग नहीं मिली। अपनी पहली लिस्टिंग पोस्ट करें!</p>;
-            }
-
-            return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {listings.map(listing => (
-                        <BarterListingCard key={listing.id} listing={listing} />
-                    ))}
-                </div>
-            );
-        };
-
-        const Header = ({ userId }) => (
-            <header className="bg-white shadow-md sticky top-0 z-10">
+        const Header = ({ currentPage, setPage }) => (
+            <header className="bg-white shadow-md sticky top-0 z-20">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
                     <h1 className="text-3xl font-extrabold text-indigo-600">
-                        Barter-<span className="text-yellow-500">Pi</span>
+                        Barter-<span className="text-yellow-500">Pi</span> Pro
                     </h1>
+                    <div className="flex space-x-2">
+                        <NavButton title="Home" page="Home" currentPage={currentPage} setPage={setPage} />
+                        <NavButton title="Chat" page="Chat" currentPage={currentPage} setPage={setPage} />
+                        <NavButton title="Orders" page="Orders" currentPage={currentPage} setPage={setPage} />
+                        <NavButton title="Admin" page="Admin" currentPage={currentPage} setPage={setPage} />
+                    </div>
                     <div className="text-sm text-gray-600 text-right">
-                        आपका यूज़र ID: 
+                        यूज़र ID: 
                         <span className="font-mono text-xs bg-gray-100 p-1 rounded block mt-1 leading-tight overflow-x-auto whitespace-nowrap">
-                            {userId || 'Loading...'}
+                            {DUMMY_USER_ID}
                         </span>
                     </div>
                 </div>
             </header>
         );
 
-        const PostNewListingButton = () => {
-            // Dummy button for now - actual functionality will be added next
+        const ListingCard = ({ listing }) => (
+            <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200 hover:shadow-2xl transition duration-300">
+                <img src={listing.image} alt={listing.itemName} className="w-full h-40 object-cover" />
+                <div className="p-4">
+                    <h3 className="text-lg font-bold text-gray-800 mb-1">{listing.itemName}</h3>
+                    <p className="text-xs text-gray-500 mb-3 h-8 overflow-hidden">{listing.description}</p>
+                    
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="text-xl font-extrabold text-indigo-600">
+                            {listing.pricePi} Pi
+                        </div>
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${listing.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {listing.status}
+                        </span>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-dashed">
+                        <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 rounded-lg text-sm transition">
+                            <span role="img" aria-label="Wallet">💰</span> Pi Payment (QR)
+                        </button>
+                        <button className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm transition">
+                            <span role="img" aria-label="Chat">💬</span> Seller से Chat करें
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // --- Pages ---
+
+        const HomePage = ({ setPage }) => {
+            const sortedListings = DUMMY_LISTINGS.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
             return (
-                <button
-                    className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-lg shadow-xl transition duration-200 transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-yellow-300"
-                    onClick={() => console.log("Post New Listing clicked")}
-                >
-                    + नई लिस्टिंग पोस्ट करें
-                </button>
+                <div className="space-y-8">
+                    {/* Search and Mapping */}
+                    <div className="bg-white p-6 rounded-xl shadow-lg border border-indigo-100">
+                        <h2 className="text-xl font-bold text-gray-800 mb-3">लोकल/ग्लोबल बार्टर</h2>
+                        <div className="flex space-x-3 mb-4">
+                            <input type="text" placeholder="आइटम या कीवर्ड खोजें..." className="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" />
+                            <button className="bg-indigo-600 text-white p-3 rounded-lg font-semibold hover:bg-indigo-700">Search</button>
+                        </div>
+                        <div className="h-40 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500">
+                            [Global/Local Mapping Placeholder]
+                        </div>
+                    </div>
+
+                    {/* Latest Listings */}
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">लेटेस्ट बार्टर लिस्टिंग्स</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {sortedListings.map(listing => (
+                            <ListingCard key={listing.id} listing={listing} />
+                        ))}
+                    </div>
+
+                    {/* Post New Section */}
+                    <section className="p-8 bg-yellow-50 border border-yellow-200 rounded-xl shadow-lg">
+                        <h2 className="text-xl font-semibold text-yellow-800 mb-4">एक नई लिस्टिंग पोस्ट करें (Seller Section)</h2>
+                        <button 
+                            className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 px-6 rounded-lg shadow-xl transition"
+                            onClick={() => alert("Post Listing Modal is now open (Dummy)")}
+                        >
+                            + नई लिस्टिंग शुरू करें
+                        </button>
+                    </section>
+                </div>
             );
-        }
+        };
+
+        const ChatPage = () => (
+            <div className="p-8 bg-white rounded-xl shadow-lg h-[600px] flex flex-col border border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">AI Chatbox & Messaging</h2>
+                
+                <div className="flex space-x-4 mb-4 border-b pb-2">
+                    <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg">💬 Buyer/Seller Chat</button>
+                    <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg">🤖 AI Helper Chat</button>
+                </div>
+
+                <div className="flex-grow bg-gray-50 p-4 rounded-lg overflow-y-scroll space-y-4">
+                    <div className="flex justify-start">
+                        <div className="bg-blue-100 p-3 rounded-xl max-w-xs">नमस्ते, मुझे iPhone 14 Pro लिस्टिंग के बारे में पूछना था।</div>
+                    </div>
+                    <div className="flex justify-end">
+                        <div className="bg-green-100 p-3 rounded-xl max-w-xs">ज़रूर! विनिमय या Pi Payment?</div>
+                    </div>
+                    <div className="text-center text-xs text-gray-500">Dummy Chat: असली मैसेजिंग लॉजिक जोड़ा जाना बाकी है।</div>
+                </div>
+
+                <div className="mt-4 flex space-x-2">
+                    <input type="text" placeholder="मैसेज लिखें..." className="flex-grow p-3 border border-gray-300 rounded-lg" />
+                    <button className="bg-indigo-600 text-white p-3 rounded-lg font-semibold">Send</button>
+                </div>
+            </div>
+        );
+
+        const OrdersPage = () => (
+            <div className="p-8 bg-white rounded-xl shadow-lg border border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">Order और Delivery Status</h2>
+                
+                {DUMMY_ORDERS.map(order => (
+                    <div key={order.id} className="mb-6 p-4 border border-gray-100 rounded-lg shadow-sm flex justify-between items-center">
+                        <div>
+                            <p className="font-semibold text-lg">{order.item}</p>
+                            <p className="text-sm text-gray-500">कीमत: {order.price} Pi | ट्रैकिंग: {order.tracking}</p>
+                            <p className="text-xs text-gray-400">Delivery Type: {order.delivery}</p>
+                        </div>
+                        <div className="text-right">
+                            <span className={`px-3 py-1 text-sm font-bold rounded-full ${order.status === 'Delivered' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-gray-900'}`}>
+                                {order.status}
+                            </span>
+                            <button className="mt-2 text-indigo-600 text-sm hover:underline block">Review लिखें</button>
+                        </div>
+                    </div>
+                ))}
+                
+                <div className="mt-8 pt-4 border-t border-dashed">
+                    <h3 className="text-xl font-semibold mb-3">Pi Wallet और Payment Overview</h3>
+                    <p className="text-sm text-gray-600">यह खंड Pi Wallet SDK और आपके भुगतान इतिहास को दिखाएगा।</p>
+                    <button className="mt-3 bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600">
+                        Wallet Connect (Dummy)
+                    </button>
+                </div>
+            </div>
+        );
+
+        const AdminPage = () => {
+            const isAdmin = DUMMY_USER_ID === ADMIN_ID; // Check for our hardcoded admin ID
+            
+            return (
+                <div className="p-8 bg-red-50 rounded-xl shadow-lg border border-red-300">
+                    <h2 className="text-2xl font-bold text-red-700 mb-4">Admin / Moderator Panel</h2>
+                    
+                    {isAdmin ? (
+                        <div className="space-y-4">
+                            <p className="text-green-700 font-semibold text-lg">✅ Access Granted: Welcome Admin!</p>
+                            <div className="bg-white p-4 rounded-lg shadow-sm">
+                                <p className="font-medium mb-2">Platform Metrics (Dummy)</p>
+                                <p>Total Listings: 500+</p>
+                                <p>Open Disputes: 3</p>
+                            </div>
+                            <button className="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700">
+                                Review Flagged Listings
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="text-lg text-red-600 font-medium">
+                            ⛔ Access Denied: आपको यह पैनल देखने की अनुमति नहीं है।
+                        </p>
+                    )}
+                </div>
+            );
+        };
 
         const App = () => {
-            const { db, auth, userId, isAuthReady, loading, error } = useFirebaseInit();
+            const [currentPage, setCurrentPage] = React.useState('Home');
 
-            if (loading) {
-                return (
-                    <div className="flex flex-col justify-center items-center h-screen bg-gray-50">
-                        <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span className="text-lg font-medium text-indigo-600 mt-4">एप्लिकेशन शुरू हो रहा है...</span>
-                        {error && <p className="text-red-500 mt-2 text-sm">शुरुआत में त्रुटि: {error}</p>}
-                    </div>
-                );
-            }
+            const renderPage = () => {
+                switch (currentPage) {
+                    case 'Home':
+                        return <HomePage setPage={setCurrentPage} />;
+                    case 'Chat':
+                        return <ChatPage />;
+                    case 'Orders':
+                        return <OrdersPage />;
+                    case 'Admin':
+                        return <AdminPage />;
+                    default:
+                        return <HomePage setPage={setCurrentPage} />;
+                }
+            };
 
             return (
-                <AppContext.Provider value={{ db, auth, userId, isAuthReady }}>
-                    <div className="min-h-screen bg-gray-50">
-                        <Header userId={userId} />
-
-                        <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-                            
-                            {/* Listing Section */}
-                            <section className="mb-12">
-                                <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">लेटेस्ट बार्टर लिस्टिंग्स</h2>
-                                <ListingList />
-                            </section>
-
-                            {/* Post New Section */}
-                            <section className="p-8 bg-indigo-50 border border-indigo-200 rounded-xl shadow-lg">
-                                <h2 className="text-xl font-semibold text-indigo-800 mb-4">एक नई लिस्टिंग पोस्ट करें</h2>
-                                <PostNewListingButton />
-                                <p className="text-xs text-indigo-500 mt-3">आपका वर्तमान यूज़र ID लिस्टिंग के साथ जोड़ा जाएगा।</p>
-                            </section>
-
-                        </main>
-                        
-                    </div>
-                </AppContext.Provider>
+                <div className="min-h-screen bg-gray-50">
+                    <Header currentPage={currentPage} setPage={setCurrentPage} />
+                    <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+                        {renderPage()}
+                    </main>
+                </div>
             );
         }
 
@@ -301,7 +280,19 @@
         const container = document.getElementById('root');
         const root = ReactDOM.createRoot(container);
         root.render(<App />);
-
     </script>
 </body>
 </html>
+```eof
+
+---
+
+### अगला कदम क्या?
+
+कृपया इस कोड को अपनी `index.html` फ़ाइल में सेव करें। यह आपके ऐप को एक **प्रोफेशनल विज़ुअल लुक** देगा।
+
+जब आप इसे देखेंगे और इससे संतुष्ट होंगे, तो हम आगे बढ़ सकते हैं:
+
+* क्या हम **ChatBox** के UI को और विस्तृत करें?
+* क्या हम **लिस्टिंग पोस्ट करने वाले Modal** के UI पर काम करें?
+* या क्या आप अब **Firebase को वापस जोड़कर** इन डमी फ़ीचर्स को **असली डेटा सेव करने** में बदलना चाहेंगे?
