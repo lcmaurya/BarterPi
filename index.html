@@ -8,7 +8,6 @@
     <title>Barter-Pi Pro - Final UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://sdk.minepi.com/sdk.js"></script> 
     <style>
         body { font-family: 'Inter', sans-serif; }
         /* मुख्य पेज सामग्री के लिए CSS */
@@ -52,8 +51,7 @@
                         <h2 class="text-4xl font-extrabold">12,456.78 <span class="text-yellow-400">Pi</span></h2>
                     </div>
                     <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
-                         <button 
-                            class="bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition text-sm opacity-50" 
+                         <button class="bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition text-sm opacity-50" 
                             id="test-pi-button" 
                             disabled 
                             onclick="processTestTransaction()">
@@ -256,6 +254,14 @@
         ];
 
         // --- PI SDK READY CHECK & INIT (Final Fix) ---
+        // Load the SDK file via JavaScript to ensure it loads late
+        function loadPiSdkScript() {
+            var script = document.createElement('script');
+            script.src = "https://sdk.minepi.com/sdk.js"; // v1 SDK for better stability
+            document.head.appendChild(script);
+            script.onload = checkPiReady; // After script is loaded, start checking
+        }
+
         function checkPiReady() {
             var piButton = document.getElementById('test-pi-button');
             if (typeof Pi !== 'undefined') {
@@ -469,7 +475,7 @@
         window.onload = function() {
             setupNavigation();
             renderListings(); // Load listings on Home page
-            checkPiReady(); // START THE PI CHECK and INITIALIZE SDK
+            loadPiSdkScript(); // START the SDK loading process
         };
     </script>
 
