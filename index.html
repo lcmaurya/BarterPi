@@ -69,3 +69,35 @@
                 </div>
             </header>
         );
+
+// --- Listing Card Component ---
+        const ListingCard = ({ listing }) => (
+            <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200 hover:shadow-2xl transition duration-300">
+                <img src={listing.image} alt={listing.itemName} className="w-full h-40 object-cover" />
+                <div className="p-4">
+                    <h3 className="text-lg font-bold text-gray-800 mb-1">{listing.itemName}</h3>
+                    <p className="text-xs text-gray-500 mb-3 h-8 overflow-hidden">{listing.description}</p>
+                    
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="text-xl font-extrabold text-indigo-600">
+                            {listing.pricePi} Pi
+                        </div>
+                        <span className={`px-3 py-1 text-xs font-medium rounded-full ${listing.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {listing.status}
+                        </span>
+                    </div>
+
+                    <div className="space-y-2 pt-2 border-t border-dashed">
+                        <button 
+                            className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-2 rounded-lg text-sm transition"
+                            onClick={() => alert(`Connecting Pi Wallet for ${listing.pricePi} Pi...`)}
+                        >
+                            <span role="img" aria-label="Wallet">💰</span> Pi Payment (QR)
+                        </button>
+                        <button className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 rounded-lg text-sm transition">
+                            <span role="img" aria-label="Chat">💬</span> Seller से Chat करें
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
