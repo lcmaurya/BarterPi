@@ -1,4 +1,4 @@
-// server.js — production-friendly starter (paste this into your repo)
+// server.js — production-ready with relaxed CSP for Pi Browser
 require('dotenv').config();
 
 const express = require('express');
@@ -15,7 +15,7 @@ const app = express();
 
 /**
  * ---------- FIREBASE ADMIN INIT ----------
- * Preferred: set GOOGLE_APPLICATION_CREDENTIALS in hosting environment (recommended).
+ * Preferred: set GOOGLE_APPLICATION_CREDENTIALS in hosting environment.
  * Alternative: set FIREBASE_SERVICE_ACCOUNT_BASE64 to base64(service-account.json).
  */
 try {
@@ -40,39 +40,49 @@ const db = admin.apps.length ? admin.firestore() : null;
 
 /**
  * ---------- SECURITY & MIDDLEWARE ----------
+ *
+ * NOTE: contentSecurityPolicy is disabled below to avoid blocking Pi Browser
+ * or other webviews from loading required external scripts/styles.
+ * This relaxes CSP only — other Helmet protections remain active.
  */
-app.use(helmet());
 app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || '*', // set to your front-end domain in prod
+  helmet({
+    contentSecurityPolicy: false,
   })
 );
+
+// Configure CORS - tighten this in production to your frontend domain
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || '*',
+  })
+);
+
+// Logging
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
+// Basic rate limiting
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 60,
 });
 app.use(limiter);
 
-// limit JSON body size
+// JSON body parsing with a reasonable limit
 app.use(express.json({ limit: '100kb' }));
 
-// Serve static files from project root (kept simple as requested)
+// Serve static files from repo root (kept as-is per your structure)
 app.use(express.static(path.join(__dirname)));
 
 /**
- * ---------- HMAC Signature VERIFICATION (placeholder)
- * This is a generic HMAC-SHA256 example. Replace with exact Pi callback verification
- * if Pi provides a different signature scheme or header name.
- *
- * Environment variable: PI_CALLBACK_SECRET
+ * ---------- HMAC Signature VERIFICATION (generic placeholder)
+ * Replace/adjust according to Pi Network's official callback verification method.
+ * Uses env var: PI_CALLBACK_SECRET
  */
 function verifySignature(req, res, next) {
   const secret = process.env.PI_CALLBACK_SECRET;
   if (!secret) {
-    // In dev you may skip, but do NOT skip in production.
-    console.warn('PI_CALLBACK_SECRET not set — skipping signature verification');
+    console.warn('PI_CALLBACK_SECRET not set — skipping signature verification (dev mode)');
     return next();
   }
 
@@ -102,7 +112,7 @@ function verifySignature(req, res, next) {
 // Health check
 app.get('/healthz', (req, res) => res.status(200).json({ status: 'ok' }));
 
-// Serve index (if present in repo root)
+// Serve index (fallback)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -137,7 +147,7 @@ app.post('/pi_callback', verifySignature, async (req, res) => {
         console.log('Firestore updated for payment:', payload.payment_id);
       } catch (err) {
         console.error('Failed to update Firestore:', err);
-        // Do not fail the callback; log and alert in production
+        // Log, but do not block callback acknowledgement
       }
     } else {
       console.warn('Firestore not available — skipping DB update');
