@@ -23,13 +23,13 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div id="app">
-        
+
         <header class="bg-white shadow-md sticky top-0 z-20">
             <div class="max-w-7xl mx-auto px-1 sm:px-2 lg:px-4 py-1 flex flex-wrap justify-between items-center"> 
-                
+
                 <div class="flex items-center">
                     <img src="barter_pi_logo.png" alt="Barter Pi Logo" class="h-6 w-6 mr-1 object-contain"/> 
-                    
+
                     <h1 class="text-xl font-extrabold text-indigo-600 w-auto">
                         Barter-<span class="text-yellow-500">Pi</span> Pro
                     </h1>
@@ -44,7 +44,7 @@
                         ADM_PRO_USER_007 <span role="img" aria-label="Verified">✅</span>
                     </span>
                 </div>
-                
+
                 <div class="flex flex-wrap justify-center sm:justify-start w-full mt-1" id="nav-buttons">
                 </div>
             </div>
@@ -52,7 +52,7 @@
 
         <main class="pb-10 max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2">
             <section id="Home" class="page-content active space-y-3">
-                
+
                 <div class="bg-indigo-600 p-3 rounded-xl shadow-xl text-white flex flex-wrap justify-between items-center">
                     <div class="w-full sm:w-auto mb-1 sm:mb-0">
                         <p class="text-xs font-semibold mb-0.5">Pi Wallet Balance (Mainnet)</p>
@@ -85,7 +85,7 @@
                         [Local Listing Map Placeholder]
                     </div>
                 </div>
-                
+
                 <div class="flex space-x-2 justify-between items-center p-2 bg-white rounded-xl shadow-lg">
                     <select id="category-filter" class="p-1 border rounded-lg text-xs">
                         <option value="">सभी कैटेगरी</option>
@@ -157,7 +157,6 @@
                     <p class="col-span-4 text-center text-indigo-500 py-10">...Loading Orders from Firebase...</p>
                 </div>
             </section>
-
             <section id="Chat" class="page-content">
                  <div class="p-4 bg-white rounded-xl shadow-lg h-[600px] flex border border-gray-200">
                     <div class="flex flex-col w-full md:w-1/3 border-r pr-3 space-y-2 overflow-y-auto hidden sm:flex">
@@ -206,7 +205,7 @@
                 </div>
             </section>
         </main>
-        
+
         <footer class="bg-white border-t p-3 text-center text-xs text-gray-500">
             Barter-Pi Pro | 🔒 Pi Escrow समर्थित | Firebase Storage Active
         </footer>
@@ -228,7 +227,7 @@
 
                         <label class="block text-sm font-medium text-gray-700 mb-1">Pi राशि दर्ज करें:</label>
                         <input type="number" id="pi-amount-input" value="1" min="0.01" step="0.01" class="w-full p-2 border rounded-lg text-sm focus:ring-indigo-500" oninput="updateGcvConversion()" />
-                        
+
                         <div class="space-y-2">
                             <div class="p-3 bg-gray-100 rounded-lg">
                                 <p class="text-sm font-medium text-gray-800">GCV मूल्य (USD) : <span id="usd-result" class="font-bold text-indigo-600">---</span></p>
@@ -243,7 +242,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="NewListing-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 justify-center items-start pt-6 p-2 hidden">
                 <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[95vh]">
                     <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
@@ -253,7 +252,7 @@
                     <form id="new-listing-form" onsubmit="handleNewListingSubmit(event)" class="p-4 space-y-3">
                         <input type="text" id="listing-name" required placeholder="आइटम का नाम" class="w-full p-2 border rounded-lg text-sm" />
                         <textarea id="listing-desc" required placeholder="आइटम का विस्तृत विवरण..." rows="3" class="w-full p-2 border rounded-lg text-sm"></textarea>
-                        
+
                         <button type="button" class="w-full bg-yellow-100 text-yellow-700 font-semibold py-2 rounded-lg text-sm hover:bg-yellow-200 transition" onclick="alert('AI Price Estimation: 150 Pi')">
                             <span role="img" aria-label="AI">💡</span> AI से **अनुशंसित Pi मूल्य** प्राप्त करें
                         </button>
@@ -272,7 +271,7 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">छवि/वीडियो अपलोड</label>
                             <input type="file" multiple class="w-full text-xs text-gray-500 file:mr-3 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
                         </div>
-                        
+
                         <div class="flex justify-end pt-3 border-t">
                             <button type="submit" class="bg-green-600 text-white font-bold py-1.5 px-3 rounded-lg text-sm hover:bg-green-700 transition shadow-md">लिस्टिंग पोस्ट करें</button>
                         </div>
@@ -289,7 +288,7 @@
         // --- GLOBAL CONSTANTS ---
         var GCV_USD_RATE = 314159.00;
         var DUMMY_INR_RATE = 83.00; // Assuming 1 USD = 83 INR
-        
+
         // --- FIREBASE CONFIGURATION (UPDATED WITH USER DATA) ---
         var firebaseConfig = {
             apiKey: "AIzaSyDFNCM6WgcClhXT8z8RPh01vHlfUpIr_H0",
@@ -314,7 +313,7 @@
             { id: 'l4', itemName: 'Farm Fresh Eggs (Local)', pricePi: 0.5, status: 'Active', category: 'Goods', posterId: 'Pioneer_004' },
             { id: 'l5', itemName: 'Pending Review Item', pricePi: 12, status: 'Pending', category: 'Goods', posterId: 'Pioneer_Admin' }, // For admin test
         ];
-        
+
         var firebaseApp;
         var db; // Firestore reference
 
@@ -325,417 +324,3 @@
         } catch (e) {
             console.error("Firebase Initialization Error. Please check console.", e);
         }
-        // --- END FIREBASE SETUP ---
-        
-        // --- GCV CONVERTER LOGIC (Active) ---
-        function updateGcvConversion() {
-            var piInput = document.getElementById('pi-amount-input');
-            var piAmount = parseFloat(piInput.value) || 0;
-            
-            var usdResult = piAmount * GCV_USD_RATE;
-            var inrResult = usdResult * DUMMY_INR_RATE;
-
-            var usdFormatted = usdResult.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
-            var inrFormatted = inrResult.toLocaleString('hi-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2 });
-            
-            document.getElementById('usd-result').innerText = usdFormatted;
-            document.getElementById('inr-result').innerText = inrFormatted;
-        }
-
-        // --- PI SDK READY CHECK & INIT (Active) ---
-        function loadPiSdkScript() {
-            var script = document.createElement('script');
-            script.src = "https://sdk.minepi.com/sdk.js"; 
-            document.head.appendChild(script);
-            script.onload = checkPiReady; 
-        }
-
-        function checkPiReady() {
-            var piButton = document.getElementById('test-pi-button');
-            if (typeof Pi !== 'undefined') {
-                try {
-                    Pi.init({
-                        onReady: function () {
-                            piButton.removeAttribute('disabled');
-                            piButton.innerText = '💲 टेस्ट Pi ट्रांजेक्शन'; 
-                            piButton.className = piButton.className.replace('opacity-50', '');
-                        }
-                    });
-                } catch (e) {
-                    piButton.innerText = '⚠️ INIT ERROR'; 
-                }
-            } else {
-                setTimeout(checkPiReady, 500); 
-            }
-        }
-        
-        // --- PI SDK TRANSACTION LOGIC (Active) ---
-        function processTestTransaction() {
-            if (typeof Pi === 'undefined') {
-                alert("FAILURE: Pi SDK not found. Please ensure the app is fully reloaded in the Pi Browser.");
-                return;
-            }
-
-            alert("Starting Pi Transaction. Follow the prompts in the Pi Browser to clear the developer checklist...");
-
-            try {
-                Pi.api.payments.create({
-                    amount: 1, 
-                    memo: "Test Transaction for Developer Checklist completion", 
-                    metadata: { app: "BarterPiPro", purpose: "checklist_clear" }
-                }, {
-                    onReadyForServerApproval: function(paymentId) {
-                        alert("SUCCESS: Transaction Ready for Server Approval! CHECKLIST CLEARED.");
-                    },
-                    onCancel: function(paymentId) {
-                        alert("FAILURE: Transaction cancelled by user.");
-                    },
-                    onError: function(error) {
-                        alert("ERROR: Transaction failed. Error: " + error.message);
-                        console.error(error);
-                    }
-                });
-            } catch (e) {
-                alert("CRITICAL ERROR: Failed to create payment. Ensure Pi Browser permissions are correct.");
-                console.error(e);
-            }
-        }
-
-        // --- NEW LISTING SUBMIT HANDLER (Active & Saves to Firebase/Dummy) ---
-        function handleNewListingSubmit(event) {
-            event.preventDefault(); 
-            
-            var listingData = {
-                itemName: document.getElementById('listing-name').value,
-                description: document.getElementById('listing-desc').value,
-                pricePi: parseFloat(document.getElementById('listing-price').value),
-                category: document.getElementById('listing-category').value,
-                posterId: DUMMY_USER_ID,
-                status: 'Pending', 
-                timestamp: new Date().toISOString()
-            };
-
-            // DUMMY SAVE (if Firebase isn't set up, uncomment the block below to use DUMMY_LISTINGS)
-            // DUMMY_LISTINGS.push(listingData);
-            // alert('DUMMY SUCCESS: लिस्टिंग DUMMY LIST में सेव हुई! ID: ' + DUMMY_LISTINGS.length);
-            // document.getElementById('new-listing-form').reset();
-            // closeModal('NewListing');
-            // renderListings();
-            // return;
-
-            // Save to Firestore (Actual logic)
-            if (db) {
-                db.collection("listings").add(listingData)
-                    .then(function(docRef) {
-                        alert('SUCCESS: लिस्टिंग Firebase में सेव हुई! ID: ' + docRef.id);
-                        document.getElementById('new-listing-form').reset();
-                        closeModal('NewListing');
-                        renderListings(); // Refresh list after saving
-                    })
-                    .catch(function(error) {
-                        alert("ERROR: Firebase में सेव नहीं हो पाया। सुरक्षा नियम (Security Rules) जांचें।");
-                        console.error("Error writing document: ", error);
-                    });
-            } else {
-                 alert("ERROR: Firebase इनिशियलाइज़ नहीं हुआ।");
-            }
-            
-            return false;
-        }
-
-        // --- CHAT LOGIC (Helper Function) ---
-        function addMessageToChat(containerId, sender, text) {
-            var messageContainer = document.getElementById(containerId);
-            var isUser = (sender === 'User');
-
-            var messageHTML = 
-                '<div class="flex ' + (isUser ? 'justify-end' : 'justify-start') + '">' +
-                    '<div class="max-w-lg p-2 rounded-xl shadow-md ' + 
-                        (isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-gray-200 text-gray-800 rounded-tl-none') + '">' +
-                        text +
-                    '</div>' +
-                '</div>';
-
-            messageContainer.innerHTML += messageHTML;
-            
-            var timeout = setTimeout(function() {
-                messageContainer.scrollTop = messageContainer.scrollHeight;
-            }, 100);
-        }
-
-        function handleAIChatSubmit(event) {
-            event.preventDefault(); 
-            var inputField = document.getElementById('ai-input');
-            var userInput = inputField.value.trim();
-
-            if (userInput === '') return;
-
-            addMessageToChat('ai-messages', 'User', userInput);
-            inputField.value = ''; 
-
-            setTimeout(function() {
-                var responseText = "Pi-संबंधित सभी सुझाव AI-जनरेटेड हैं। हमें विशिष्ट ट्रेडिंग गाइडेंस के लिए प्रोफ़ाइल पेज पर जाएँगे।";
-                
-                if (userInput.toLowerCase().includes('price') || userInput.toLowerCase().includes('मूल्य')) {
-                    responseText = "AI Estimation: इस आइटम का अनुशंसित Pi मूल्य 150-200 Pi के बीच है।";
-                }
-                
-                addMessageToChat('ai-messages', 'AI', responseText);
-            }, 1000); 
-        }
-
-        function handleChatSubmit(event) {
-            event.preventDefault(); 
-            var inputField = document.getElementById('chat-input');
-            var userInput = inputField.value.trim();
-
-            if (userInput === '') return;
-
-            addMessageToChat('chat-history-container', 'User', userInput);
-            inputField.value = ''; 
-
-            setTimeout(function() {
-                addMessageToChat('chat-history-container', 'Other', 'जी, बिल्कुल। मैं जल्द ही आपको शिपिंग डिटेल्स भेजता हूँ।');
-            }, 1500); 
-            
-            var chatContainer = document.getElementById('chat-history-container');
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        // --- ORDER STATUS HANDLING (Active) ---
-        function handleOrderStatusChange(orderId, action) {
-            if (action === 'confirm_delivery') {
-                alert('SUCCESS: डिलीवरी की पुष्टि हुई! ' + orderId + ' के लिए Escrow Pi रिलीज़ किया जा रहा है।');
-            } else if (action === 'update_tracking') {
-                alert('ACTION: ' + orderId + ' के लिए नया ट्रैकिंग मोडल/पॉप-अप खोला जा रहा है।');
-            } else if (action === 'dispute') {
-                alert('DISPUTE: ' + orderId + ' के लिए विवाद दर्ज हुआ। Escrow फ़ंड फ़्रीज़ किए जा रहे हैं।');
-            }
-            renderOrders(); 
-        }
-
-        // --- ADMIN ACTIONS (Active) ---
-        function handleAdminAction(type, action, itemId) {
-            if (type === 'review') {
-                // Using DUMMY_LISTINGS for demonstration if Firebase is not active
-                var targetListing = DUMMY_LISTINGS.find(l => l.id === itemId);
-                if (targetListing) {
-                    targetListing.status = (action === 'approve' ? 'Active' : 'Rejected');
-                    alert('DUMMY MODERATOR: लिस्टिंग ' + itemId + ' सफलतापूर्वक ' + (action === 'approve' ? 'स्वीकृत' : 'अस्वीकृत') + '।');
-                    switchPage('Admin'); 
-                    switchPage('Home');
-                    return;
-                }
-                
-                // Actual Firebase Logic:
-                if (db) {
-                    db.collection("listings").doc(itemId).update({ status: (action === 'approve' ? 'Active' : 'Rejected') })
-                        .then(function() {
-                            alert('MODERATOR: लिस्टिंग ' + itemId + ' सफलतापूर्वक ' + (action === 'approve' ? 'स्वीकृत' : 'अस्वीकृत') + '।');
-                            switchPage('Admin'); 
-                            switchPage('Home');
-                        })
-                        .catch(function(error) {
-                            alert("ERROR: अपडेट नहीं हो पाया: " + error.message);
-                        });
-                } else {
-                    alert('MODERATOR: Firebase इनिशियलाइज़ नहीं हुआ।');
-                }
-            } else if (type === 'dispute_resolve') {
-                alert('MODERATOR: विवाद ' + itemId + ' के लिए समाधान मोडल खोला गया।');
-            }
-        }
-
-        // --- NAVIGATION LOGIC (Active) ---
-        function setupNavigation() {
-            var pages = {
-                'Home': 'होम', 'Profile': 'प्रोफ़ाइल', 'Orders': 'ऑर्डर्स', 
-                'Chat': 'चैट', 'AIHelper': 'AI हेल्पर', 'Admin': 'एडमिन'
-            };
-            var navContainer = document.getElementById('nav-buttons');
-            var ADMIN_ID = DUMMY_USER_ID; 
-
-            navContainer.innerHTML = ''; 
-
-            for (var pageId in pages) {
-                if (pageId === 'Admin' && DUMMY_USER_ID !== ADMIN_ID) continue;
-                
-                var button = document.createElement('button');
-                button.innerHTML = pages[pageId];
-                button.setAttribute('data-page', pageId);
-                
-                // BUTTON TEXT SIZED DOWN (text-2xs is custom size)
-                button.className = 'nav-button px-1.5 py-0.5 rounded-lg text-2xs font-medium m-0.5 transition duration-200 text-gray-600 hover:bg-gray-100 whitespace-nowrap';
-                
-                button.onclick = function() { switchPage(this.getAttribute('data-page')); };
-                navContainer.appendChild(button);
-            }
-
-            switchPage('Home');
-        }
-
-        function switchPage(pageId) {
-            var contents = document.getElementsByClassName('page-content');
-            for (var i = 0; i < contents.length; i++) {
-                contents[i].className = contents[i].className.replace(' active', '');
-            }
-            
-            var targetPage = document.getElementById(pageId);
-            if (targetPage) {
-                targetPage.className += ' active';
-            }
-
-            var buttons = document.getElementsByClassName('nav-button');
-            for (var i = 0; i < buttons.length; i++) {
-                var btn = buttons[i];
-                btn.className = btn.className.replace(' bg-indigo-600 text-white shadow-lg', '');
-                if (btn.getAttribute('data-page') === pageId) {
-                    btn.className += ' bg-indigo-600 text-white shadow-lg';
-                }
-            }
-            
-            // Render content based on page
-            if (pageId === 'Orders') { renderOrders(); }
-            if (pageId === 'Home') { renderListings(); }
-            if (pageId === 'Admin') { renderAdmin(); }
-        }
-
-        // --- MODAL LOGIC (Active) ---
-        function openModal(modalId) {
-            var modal = document.getElementById(modalId + '-modal');
-            if (modal) {
-                if (modalId === 'GcvConverter') {
-                    updateGcvConversion(); 
-                }
-                modal.style.display = 'flex';
-            }
-        }
-        function closeModal(modalId) {
-            var modal = document.getElementById(modalId + '-modal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
-        }
-
-        // --- LOGIN LOGIC (Active) ---
-        function loginUser() {
-            alert('Pi Network Login SDK call simulated. Logging in...');
-            document.getElementById('login-section').style.display = 'none';
-            document.getElementById('dashboard-section').style.display = 'block';
-        }
-
-        // --- LISTING RENDERING (Now uses DUMMY_LISTINGS or Firebase) ---
-        function renderListings() {
-            var grid = document.getElementById('listings-grid');
-            var categoryFilter = document.getElementById('category-filter').value;
-            grid.innerHTML = '<p class="col-span-4 text-center text-indigo-500 py-6">Loading listings...</p>';
-            
-            var listingsToRender = DUMMY_LISTINGS.filter(l => l.status === 'Active' && (!categoryFilter || l.category === categoryFilter));
-
-            var html = '';
-            if (listingsToRender.length === 0) {
-                grid.innerHTML = '<p class="col-span-4 text-center text-gray-500 py-6">कोई लिस्टिंग नहीं मिली।</p>';
-                // If using Firebase, uncomment the Firebase fetch logic here
-                return;
-            }
-
-            listingsToRender.forEach(function(listing) {
-                var statusClass = listing.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
-                var itemImageText = listing.itemName.replace(/ /g, '+');
-                var docId = listing.id;
-                var displayStatus = (listing.status === 'Pending') ? 'Pending' : listing.status;
-
-                html += '<div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 hover:shadow-2xl hover:cursor-pointer transition duration-300 transform hover:scale-[1.02]" onclick="alert(\'Viewing details for ' + listing.itemName + ' (ID: ' + docId + ')\')">';
-                html += '<img src="https://via.placeholder.com/400x300?text=' + itemImageText + '" alt="' + listing.itemName + '" class="w-full h-36 object-cover" />';
-                html += '<div class="p-3">';
-                html += '<h3 class="text-base font-bold text-gray-800 mb-1 h-10 overflow-hidden">' + listing.itemName + '</h3>';
-                html += '<div class="flex justify-between items-center mb-2">';
-                html += '<div class="text-xl font-extrabold text-indigo-600">' + listing.pricePi + ' Pi</div>';
-                html += '<span class="px-2 py-0.5 text-2xs font-medium rounded-full ' + statusClass + '">' + displayStatus + '</span>';
-                html += '</div>';
-                html += '<button class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-1.5 rounded-lg text-sm transition">ℹ️ विवरण देखें</button>';
-                html += '</div></div>';
-            });
-            grid.innerHTML = html;
-        }
-
-        // --- ORDER RENDERING (Now uses DUMMY_ORDERS) ---
-        function renderOrders() {
-            var listContainer = document.getElementById('orders-list');
-            var html = '<h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">📦 मेरे सभी ऑर्डर्स</h3>';
-            
-            if (DUMMY_ORDERS.length === 0) {
-                listContainer.innerHTML = '<p class="text-center py-8 text-gray-500">अभी कोई ऑर्डर रिकॉर्ड नहीं मिला।</p>';
-                return;
-            }
-
-            DUMMY_ORDERS.forEach(function(order) {
-                var orderId = order.id;
-                var statusClass = order.status === 'Delivered' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-gray-900';
-                var escrowStatus = order.escrow === 'Active' ? '🔒 Escrow Active' : '✅ Pi Released';
-                var isBuying = (order.buyerId === DUMMY_USER_ID); 
-                var typeClass = isBuying ? 'bg-blue-50' : 'bg-green-50';
-
-                html += '<div class="mb-3 p-3 border rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center ' + typeClass + '">';
-                html += '<div>';
-                html += '<p class="font-semibold text-base">' + order.item + ' <span class="text-xs font-medium text-gray-500">(' + (isBuying ? 'खरीद' : 'बिक्री') + ')</span></p>';
-                html += '<p class="text-sm text-gray-500">कीमत: **' + order.pricePi + ' Pi** | Escrow: ' + escrowStatus + '</p>';
-                html += '</div>';
-                html += '<div class="text-right mt-1 sm:mt-0">';
-                html += '<span class="px-2 py-0.5 text-xs font-bold rounded-full block ' + statusClass + '">' + order.status + '</span>';
-                
-                if (isBuying && order.status === 'Shipped') {
-                    html += '<button onclick="handleOrderStatusChange(\'' + orderId + '\', \'confirm_delivery\')" class="mt-1 text-green-600 text-xs hover:underline block font-semibold">✅ डिलीवरी की पुष्टि करें</button>';
-                    html += '<button onclick="handleOrderStatusChange(\'' + orderId + '\', \'dispute\')" class="mt-1 text-red-600 text-xs hover:underline block font-semibold">❓ विवाद दर्ज करें</button>';
-                } else if (!isBuying && order.status === 'Shipped') {
-                    html += '<button onclick="handleOrderStatusChange(\'' + orderId + '\', \'update_tracking\')" class="bg-indigo-600 text-white py-1 px-2 rounded-lg text-xs font-semibold mt-1">ट्रैकिंग अपडेट करें</button>';
-                }
-                
-                html += '</div></div>';
-            });
-            listContainer.innerHTML = html;
-        }
-
-
-        // --- ADMIN PAGE RENDERING (Now uses DUMMY_LISTINGS) ---
-        function renderAdmin() {
-            var adminContainer = document.getElementById('Admin');
-            var pendingListings = DUMMY_LISTINGS.filter(l => l.status === 'Pending');
-
-            var reviewHtml = '<div class="bg-white p-5 rounded-xl shadow-lg border-l-4 border-yellow-600"><h3 class="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">समीक्षा के लिए लंबित लिस्टिंग्स (' + pendingListings.length + ')</h3><ul class="space-y-2">';
-            
-            if (pendingListings.length === 0) {
-                reviewHtml += '<li class="text-gray-500 text-sm">कोई लंबित लिस्टिंग नहीं।</li>';
-            } else {
-                pendingListings.forEach(function(listing) {
-                    var docId = listing.id;
-                    reviewHtml += '<li class="p-2 border rounded-lg flex justify-between items-center bg-yellow-50">';
-                    reviewHtml += '<span class="font-medium text-sm">' + listing.itemName + ' (' + listing.pricePi + ' Pi)</span>';
-                    reviewHtml += '<div>';
-                    reviewHtml += '<button onclick="handleAdminAction(\'review\', \'approve\', \'' + docId + '\')" class="text-green-600 hover:text-green-800 text-xs font-semibold mr-2">स्वीकृत करें</button>';
-                    reviewHtml += '<button onclick="handleAdminAction(\'review\', \'reject\', \'' + docId + '\')" class="text-red-600 hover:text-red-800 text-xs font-semibold">अस्वीकृत करें</button>';
-                    reviewHtml += '</div></li>';
-                });
-            }
-            reviewHtml += '</ul></div>';
-
-            var disputeHtml = '<div class="mt-6 bg-white p-5 rounded-xl shadow-lg border-l-4 border-red-600"><h3 class="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">विवाद समाधान (Dummy)</h3><p class="text-xs text-gray-500">यहां लंबित विवादों को मॉडरेटर द्वारा हल किया जाएगा।</p></div>';
-
-            adminContainer.innerHTML = reviewHtml + disputeHtml;
-        }
-
-        // --- INITIALIZATION (Final Fix) ---
-        window.onload = function() {
-            setupNavigation();
-            
-            var categoryFilter = document.getElementById('category-filter');
-            if (categoryFilter) {
-                categoryFilter.addEventListener('change', renderListings);
-            }
-
-            renderListings(); 
-            loadPiSdkScript(); 
-        };
-    </script>
-</body>
-</html>
