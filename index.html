@@ -154,7 +154,7 @@
             <section id="Orders" class="page-content space-y-4">
                 <h2 class="text-2xl font-bold text-indigo-600 border-b pb-2">Order और ट्रैकिंग</h2>
                 <div id="orders-list">
-                    <p class="col-span-4 text-center text-indigo-500 py-10">...Loading Orders from Firebase...</p>
+                    <p class="col-span-4 text-indigo-500 py-10">...Loading Orders from Firebase...</p>
                 </div>
             </section>
             <section id="Chat" class="page-content">
@@ -294,7 +294,7 @@
             apiKey: "AIzaSyDFNCM6WgcClhXT8z8RPh01vHlfUpIr_H0",
             authDomain: "barterpi-new.firebaseapp.com",
             projectId: "barterpi-new",
-            storageBucket: "barterpi-new.firebasestorage.app",
+            storageBucket: "barterpi-new.appspot.com", // ✅ यह मान अब Console से मिलान किया गया है
             messagingSenderId: "11091860587",
             appId: "1:11091860587:web:eaa398efc41db33ccae52e"
         };
@@ -306,7 +306,7 @@
             { id: 'o2', item: 'Laptop Repair', pricePi: 35, status: 'Delivered', escrow: 'Released', type: 'sell', buyerId: 'Buyer_001', sellerId: DUMMY_USER_ID },
             { id: 'o3', item: 'Used Car', pricePi: 1500, status: 'Pending', escrow: 'Active', type: 'buy', buyerId: DUMMY_USER_ID, sellerId: 'Seller_002' },
         ];
-        // DUMMY_LISTINGS को हटा दिया गया है। (No DUMMY)
+        // DUMMY_LISTINGS को हटा दिया गया है।
 
         var firebaseApp;
         var db; // Firestore reference
@@ -404,11 +404,9 @@
                 pricePi: parseFloat(document.getElementById('listing-price').value),
                 category: document.getElementById('listing-category').value,
                 posterId: DUMMY_USER_ID,
-                status: 'Active', // डायरेक्ट 'Active' पर सेट, एडमिन अप्रूवल बायपास
-                timestamp: new Date().toISOString() // सॉर्टिंग के लिए टाइमस्टैम्प
+                status: 'Active', 
+                timestamp: new Date().toISOString()
             };
-
-            // DUMMY SAVE ब्लॉक को हटा दिया गया है।
 
             // Save to Firestore (Actual logic)
             if (db) {
@@ -504,8 +502,6 @@
         // --- ADMIN ACTIONS (Active) ---
         function handleAdminAction(type, action, itemId) {
             if (type === 'review') {
-                // DUMMY_LISTINGS का उपयोग हटा दिया गया है
-
                 // Actual Firebase Logic:
                 if (db) {
                     db.collection("listings").doc(itemId).update({ status: (action === 'approve' ? 'Active' : 'Rejected') })
@@ -701,7 +697,6 @@
         // --- ADMIN PAGE RENDERING (DUMMY ONLY) ---
         function renderAdmin() {
             var adminContainer = document.getElementById('Admin');
-            // DUMMY_LISTINGS को हटा दिया गया है, इसलिए Admin रिव्यू पेज खाली दिखेगा जब तक हम इसे Firebase से नहीं जोड़ते
             var pendingListings = []; 
 
             var reviewHtml = '<div class="bg-white p-5 rounded-xl shadow-lg border-l-4 border-yellow-600"><h3 class="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">समीक्षा के लिए लंबित लिस्टिंग्स (' + pendingListings.length + ')</h3><ul class="space-y-2">';
