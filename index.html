@@ -25,27 +25,30 @@
     <div id="app">
         
         <header class="bg-white shadow-md sticky top-0 z-20">
-            <div class="max-w-7xl mx-auto px-1 sm:px-2 lg:px-4 py-1 flex flex-wrap justify-between items-center"> 
+            <div class="max-w-7xl mx-auto px-1 sm:px-2 lg:px-4 py-1 flex flex-col sm:flex-row justify-between items-center"> 
                 
-                <div class="flex items-center">
-                    <img src="barter_pi_logo.png" alt="Barter Pi Logo" class="h-6 w-6 mr-1 object-contain"/> 
+                <div class="flex justify-between items-center w-full sm:w-auto pb-1 border-b sm:border-b-0 border-gray-100">
                     
-                    <h1 class="text-xl font-extrabold text-indigo-600 w-auto">
-                        Barter-<span class="text-yellow-500">Pi</span> Pro
-                    </h1>
-                </div>
+                    <div class="flex items-center space-x-1">
+                        <img src="barter_pi_logo.jpg" alt="Barter Pi Logo" class="h-6 w-6 object-contain"/>
+                        
+                        <h1 class="text-xl font-extrabold text-indigo-600 w-auto">
+                            Barter-<span class="text-yellow-500">Pi</span> Pro
+                        </h1>
+                    </div>
 
-                <div class="text-sm text-gray-600 text-right mt-0.5 w-auto ml-auto flex items-center space-x-1">
-                    <select class="bg-gray-100 p-0.5 rounded text-xs">
-                        <option>🌐 Hindi</option>
-                        <option>🌐 English</option>
-                    </select>
-                    <span class="font-mono text-xs bg-gray-100 p-0.5 rounded whitespace-nowrap">
-                        ADM_PRO_USER_007 <span role="img" aria-label="Verified">✅</span>
-                    </span>
+                    <div class="flex items-center space-x-1 ml-auto">
+                        <select class="bg-gray-100 p-0.5 rounded text-2xs">
+                            <option>🌐 Hindi</option>
+                            <option>🌐 English</option>
+                        </select>
+                        <span class="font-mono text-2xs bg-gray-100 p-0.5 rounded whitespace-nowrap">
+                            ADM_PRO_USER_007 <span role="img" aria-label="Verified">✅</span>
+                        </span>
+                    </div>
                 </div>
                 
-                <div class="flex flex-wrap justify-center sm:justify-start w-full mt-1" id="nav-buttons">
+                <div class="flex flex-wrap justify-center sm:justify-start w-full mt-1 sm:mt-0" id="nav-buttons">
                 </div>
             </div>
         </header>
