@@ -306,7 +306,7 @@
             { id: 'o2', item: 'Laptop Repair', pricePi: 35, status: 'Delivered', escrow: 'Released', type: 'sell', buyerId: 'Buyer_001', sellerId: DUMMY_USER_ID },
             { id: 'o3', item: 'Used Car', pricePi: 1500, status: 'Pending', escrow: 'Active', type: 'buy', buyerId: DUMMY_USER_ID, sellerId: 'Seller_002' },
         ];
-        
+        // DUMMY_LISTINGS को हटा दिया गया है। (No DUMMY)
 
         var firebaseApp;
         var db; // Firestore reference
@@ -318,7 +318,6 @@
         } catch (e) {
             console.error("Firebase Initialization Error. Please check console.", e);
         }
-
 // --- END FIREBASE SETUP ---
 
         // --- GCV CONVERTER LOGIC (Active) ---
@@ -395,7 +394,7 @@
             }
         }
 
-        // --- NEW LISTING SUBMIT HANDLER (Active & Saves to Firebase/Dummy) ---
+        // --- NEW LISTING SUBMIT HANDLER (LIVE FIREBASE ONLY) ---
         function handleNewListingSubmit(event) {
             event.preventDefault(); 
 
@@ -405,17 +404,11 @@
                 pricePi: parseFloat(document.getElementById('listing-price').value),
                 category: document.getElementById('listing-category').value,
                 posterId: DUMMY_USER_ID,
-                status: 'Active', // <-- *** ⭐ बदलाव 1: इसे 'Pending' से 'Active' कर दिया गया है ***
-                timestamp: new Date().toISOString()
+                status: 'Active', // डायरेक्ट 'Active' पर सेट, एडमिन अप्रूवल बायपास
+                timestamp: new Date().toISOString() // सॉर्टिंग के लिए टाइमस्टैम्प
             };
 
-            // DUMMY SAVE (if Firebase isn't set up, uncomment the block below to use DUMMY_LISTINGS)
-            // DUMMY_LISTINGS.push(listingData);
-            // alert('DUMMY SUCCESS: लिस्टिंग DUMMY LIST में सेव हुई! ID: ' + DUMMY_LISTINGS.length);
-            // document.getElementById('new-listing-form').reset();
-            // closeModal('NewListing');
-            // renderListings();
-            // return;
+            // DUMMY SAVE ब्लॉक को हटा दिया गया है।
 
             // Save to Firestore (Actual logic)
             if (db) {
@@ -511,15 +504,7 @@
         // --- ADMIN ACTIONS (Active) ---
         function handleAdminAction(type, action, itemId) {
             if (type === 'review') {
-                // Using DUMMY_LISTINGS for demonstration if Firebase is not active
-                var targetListing = DUMMY_LISTINGS.find(l => l.id === itemId);
-                if (targetListing) {
-                    targetListing.status = (action === 'approve' ? 'Active' : 'Rejected');
-                    alert('DUMMY MODERATOR: लिस्टिंग ' + itemId + ' सफलतापूर्वक ' + (action === 'approve' ? 'स्वीकृत' : 'अस्वीकृत') + '।');
-                    switchPage('Admin'); 
-                    switchPage('Home');
-                    return;
-                }
+                // DUMMY_LISTINGS का उपयोग हटा दिया गया है
 
                 // Actual Firebase Logic:
                 if (db) {
@@ -617,9 +602,7 @@
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = 'block';
         }
-
-        // --- ⭐ बदलाव 2: (renderListings फंक्शन को DUMMY की जगह Firebase से बदला गया) ---
-        // --- LISTING RENDERING (Firebase से लाइव डेटा) ---
+        // --- LISTING RENDERING (LIVE FIREBASE ONLY) ---
         function renderListings() {
             var grid = document.getElementById('listings-grid');
             var categoryFilter = document.getElementById('category-filter').value;
@@ -639,6 +622,7 @@
             if (categoryFilter) {
                 query = query.where("category", "==", categoryFilter);
             }
+
             // 3. Firebase से डेटा मंगवाएं
             query.get()
                 .then(function(querySnapshot) {
@@ -674,10 +658,9 @@
                     grid.innerHTML = '<p class="col-span-4 text-center text-red-500 py-6">लिस्टिंग लोड करने में एरर आया।</p>';
                 });
         }
-        // --- (⭐ बदलाव 2 यहाँ समाप्त होता है) ---
 
 
-        // --- ORDER RENDERING (Now uses DUMMY_ORDERS) ---
+        // --- ORDER RENDERING (DUMMY ONLY) ---
         function renderOrders() {
             var listContainer = document.getElementById('orders-list');
             var html = '<h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">📦 मेरे सभी ऑर्डर्स</h3>';
@@ -715,25 +698,18 @@
         }
 
 
-        // --- ADMIN PAGE RENDERING (Now uses DUMMY_LISTINGS) ---
+        // --- ADMIN PAGE RENDERING (DUMMY ONLY) ---
         function renderAdmin() {
             var adminContainer = document.getElementById('Admin');
-            var pendingListings = DUMMY_LISTINGS.filter(l => l.status === 'Pending');
+            // DUMMY_LISTINGS को हटा दिया गया है, इसलिए Admin रिव्यू पेज खाली दिखेगा जब तक हम इसे Firebase से नहीं जोड़ते
+            var pendingListings = []; 
 
             var reviewHtml = '<div class="bg-white p-5 rounded-xl shadow-lg border-l-4 border-yellow-600"><h3 class="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">समीक्षा के लिए लंबित लिस्टिंग्स (' + pendingListings.length + ')</h3><ul class="space-y-2">';
 
             if (pendingListings.length === 0) {
                 reviewHtml += '<li class="text-gray-500 text-sm">कोई लंबित लिस्टिंग नहीं।</li>';
             } else {
-                pendingListings.forEach(function(listing) {
-                    var docId = listing.id;
-                    reviewHtml += '<li class="p-2 border rounded-lg flex justify-between items-center bg-yellow-50">';
-                    reviewHtml += '<span class="font-medium text-sm">' + listing.itemName + ' (' + listing.pricePi + ' Pi)</span>';
-                    reviewHtml += '<div>';
-                    reviewHtml += '<button onclick="handleAdminAction(\'review\', \'approve\', \'' + docId + '\')" class="text-green-600 hover:text-green-800 text-xs font-semibold mr-2">स्वीकृत करें</button>';
-                    reviewHtml += '<button onclick="handleAdminAction(\'review\', \'reject\', \'' + docId + '\')" class="text-red-600 hover:text-red-800 text-xs font-semibold">अस्वीकृत करें</button>';
-                    reviewHtml += '</div></li>';
-                });
+                // यह सेक्शन Firebase से कनेक्ट न होने के कारण काम नहीं करेगा।
             }
             reviewHtml += '</ul></div>';
 
